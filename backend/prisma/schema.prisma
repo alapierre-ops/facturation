@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  email     String    @unique
+  password  String
+  name      String
+  role      String    @default("user")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  clients   Client[]
+  projects  Project[]
+  devis     Devis[]
+  factures  Facture[]
+}
+
+model Client {
+  id        Int       @id @default(autoincrement())
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id])
+  projects  Project[]
+  devis     Devis[]
+  factures  Facture[]
+}
+
+model Project {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String?
+  status      String    @default("pending")
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id])
+  clientId    Int
+  client      Client    @relation(fields: [clientId], references: [id])
+  devis       Devis[]
+  factures    Facture[]
+}
+
+model Devis {
+  id          Int          @id @default(autoincrement())
+  number      String       @unique
+  date        DateTime     @default(now())
+  status      String       @default("draft")
+  totalHT     Float
+  totalTTC    Float
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  userId      Int
+  user        User         @relation(fields: [userId], references: [id])
+  clientId    Int
+  client      Client       @relation(fields: [clientId], references: [id])
+  projectId   Int?
+  project     Project?     @relation(fields: [projectId], references: [id])
+  lignes      LigneDevis[]
+  factures    Facture[]
+}
+
+model LigneDevis {
+  id          Int      @id @default(autoincrement())
+  description String
+  quantity    Float
+  unitPrice   Float
+  totalHT     Float
+  totalTTC    Float
+  devisId     Int
+  devis       Devis    @relation(fields: [devisId], references: [id])
+}
+
+model Facture {
+  id          Int           @id @default(autoincrement())
+  number      String        @unique
+  date        DateTime      @default(now())
+  dueDate     DateTime
+  status      String        @default("draft")
+  totalHT     Float
+  totalTTC    Float
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  userId      Int
+  user        User          @relation(fields: [userId], references: [id])
+  clientId    Int
+  client      Client        @relation(fields: [clientId], references: [id])
+  projectId   Int?
+  project     Project?      @relation(fields: [projectId], references: [id])
+  devisId     Int?
+  devis       Devis?        @relation(fields: [devisId], references: [id])
+  lignes      LigneFacture[]
+}
+
+model LigneFacture {
+  id          Int      @id @default(autoincrement())
+  description String
+  quantity    Float
+  unitPrice   Float
+  totalHT     Float
+  totalTTC    Float
+  factureId   Int
+  facture     Facture  @relation(fields: [factureId], references: [id])
+} 
