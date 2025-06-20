@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 
 const STATUS_OPTIONS = [
   { label: 'Prospect', value: 'prospect' },
-  { label: 'In Progress', value: 'in progress' },
+  { label: 'Pending', value: 'pending' },
   { label: 'Finished', value: 'finished' },
   { label: 'Cancelled', value: 'cancelled' },
 ];

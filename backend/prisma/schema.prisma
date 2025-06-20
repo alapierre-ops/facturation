@@ -17,8 +17,8 @@ model User {
   updatedAt DateTime  @updatedAt
   clients   Client[]
   projects  Project[]
-  devis     Devis[]
-  factures  Facture[]
+  quotes    Quotes[]
+  invoices  Invoice[]
 }
 
 model Client {
@@ -32,8 +32,8 @@ model Client {
   userId    Int
   user      User      @relation(fields: [userId], references: [id])
   projects  Project[]
-  devis     Devis[]
-  factures  Facture[]
+  quotes    Quotes[]
+  invoices  Invoice[]
 }
 
 model Project {
@@ -49,11 +49,11 @@ model Project {
   user        User      @relation(fields: [userId], references: [id])
   clientId    Int
   client      Client    @relation(fields: [clientId], references: [id])
-  devis       Devis[]
-  factures    Facture[]
+  quotes      Quotes[]
+  invoices    Invoice[]
 }
 
-model Devis {
+model Quotes {
   id          Int          @id @default(autoincrement())
   number      String       @unique
   date        DateTime     @default(now())
@@ -68,22 +68,22 @@ model Devis {
   client      Client       @relation(fields: [clientId], references: [id])
   projectId   Int?
   project     Project?     @relation(fields: [projectId], references: [id])
-  lignes      LigneDevis[]
-  factures    Facture[]
+  lines       LineQuote[]
+  invoices    Invoice[]
 }
 
-model LigneDevis {
+model LineQuote {
   id          Int      @id @default(autoincrement())
   description String
   quantity    Float
   unitPrice   Float
   totalHT     Float
   totalTTC    Float
-  devisId     Int
-  devis       Devis    @relation(fields: [devisId], references: [id])
+  quoteId     Int
+  quotes      Quotes    @relation(fields: [quoteId], references: [id])
 }
 
-model Facture {
+model Invoice {
   id          Int           @id @default(autoincrement())
   number      String        @unique
   date        DateTime      @default(now())
@@ -99,18 +99,18 @@ model Facture {
   client      Client        @relation(fields: [clientId], references: [id])
   projectId   Int?
   project     Project?      @relation(fields: [projectId], references: [id])
-  devisId     Int?
-  devis       Devis?        @relation(fields: [devisId], references: [id])
-  lignes      LigneFacture[]
+  quoteId     Int?
+  quotes      Quotes?        @relation(fields: [quoteId], references: [id])
+  lines       LineInvoice[]
 }
 
-model LigneFacture {
+model LineInvoice {
   id          Int      @id @default(autoincrement())
   description String
   quantity    Float
   unitPrice   Float
   totalHT     Float
   totalTTC    Float
-  factureId   Int
-  facture     Facture  @relation(fields: [factureId], references: [id])
+  invoiceId   Int
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id])
 } 

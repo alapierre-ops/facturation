@@ -42,7 +42,7 @@ CREATE TABLE "Project" (
 );
 
 -- CreateTable
-CREATE TABLE "Devis" (
+CREATE TABLE "Quotes" (
     "id" SERIAL NOT NULL,
     "number" TEXT NOT NULL,
     "date" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -55,24 +55,24 @@ CREATE TABLE "Devis" (
     "clientId" INTEGER NOT NULL,
     "projectId" INTEGER,
 
-    CONSTRAINT "Devis_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "Quotes_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "LigneDevis" (
+CREATE TABLE "LineQuotes" (
     "id" SERIAL NOT NULL,
     "description" TEXT NOT NULL,
     "quantity" DOUBLE PRECISION NOT NULL,
     "unitPrice" DOUBLE PRECISION NOT NULL,
     "totalHT" DOUBLE PRECISION NOT NULL,
     "totalTTC" DOUBLE PRECISION NOT NULL,
-    "devisId" INTEGER NOT NULL,
+    "quoteId" INTEGER NOT NULL,
 
-    CONSTRAINT "LigneDevis_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "LineQuotes_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "Facture" (
+CREATE TABLE "Invoice" (
     "id" SERIAL NOT NULL,
     "number" TEXT NOT NULL,
     "date" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -85,32 +85,32 @@ CREATE TABLE "Facture" (
     "userId" INTEGER NOT NULL,
     "clientId" INTEGER NOT NULL,
     "projectId" INTEGER,
-    "devisId" INTEGER,
+    "quoteId" INTEGER,
 
-    CONSTRAINT "Facture_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "Invoice_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "LigneFacture" (
+CREATE TABLE "LineInvoice" (
     "id" SERIAL NOT NULL,
     "description" TEXT NOT NULL,
     "quantity" DOUBLE PRECISION NOT NULL,
     "unitPrice" DOUBLE PRECISION NOT NULL,
     "totalHT" DOUBLE PRECISION NOT NULL,
     "totalTTC" DOUBLE PRECISION NOT NULL,
-    "factureId" INTEGER NOT NULL,
+    "invoiceId" INTEGER NOT NULL,
 
-    CONSTRAINT "LigneFacture_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "LineInvoice_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Devis_number_key" ON "Devis"("number");
+CREATE UNIQUE INDEX "Quotes_number_key" ON "Quotes"("number");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Facture_number_key" ON "Facture"("number");
+CREATE UNIQUE INDEX "Invoice_number_key" ON "Invoice"("number");
 
 -- AddForeignKey
 ALTER TABLE "Client" ADD CONSTRAINT "Client_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -122,28 +122,28 @@ ALTER TABLE "Project" ADD CONSTRAINT "Project_userId_fkey" FOREIGN KEY ("userId"
 ALTER TABLE "Project" ADD CONSTRAINT "Project_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "Client"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Devis" ADD CONSTRAINT "Devis_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Quotes" ADD CONSTRAINT "Quotes_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Devis" ADD CONSTRAINT "Devis_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "Client"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Quotes" ADD CONSTRAINT "Quotes_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "Client"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Devis" ADD CONSTRAINT "Devis_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "Quotes" ADD CONSTRAINT "Quotes_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "LigneDevis" ADD CONSTRAINT "LigneDevis_devisId_fkey" FOREIGN KEY ("devisId") REFERENCES "Devis"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "LineQuotes" ADD CONSTRAINT "LineQuotes_quoteId_fkey" FOREIGN KEY ("quoteId") REFERENCES "Quotes"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Facture" ADD CONSTRAINT "Facture_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Invoice" ADD CONSTRAINT "Invoice_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Facture" ADD CONSTRAINT "Facture_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "Client"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Invoice" ADD CONSTRAINT "Invoice_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "Client"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Facture" ADD CONSTRAINT "Facture_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "Invoice" ADD CONSTRAINT "Invoice_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Facture" ADD CONSTRAINT "Facture_devisId_fkey" FOREIGN KEY ("devisId") REFERENCES "Devis"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "Invoice" ADD CONSTRAINT "Invoice_quoteId_fkey" FOREIGN KEY ("quoteId") REFERENCES "Quotes"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "LigneFacture" ADD CONSTRAINT "LigneFacture_factureId_fkey" FOREIGN KEY ("factureId") REFERENCES "Facture"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "LineInvoice" ADD CONSTRAINT "LineInvoice_invoiceId_fkey" FOREIGN KEY ("invoiceId") REFERENCES "Invoice"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

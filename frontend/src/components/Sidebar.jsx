@@ -12,7 +12,7 @@ const Layout = () => {
     { name: 'Dashboard', path: '/dashboard', icon: FiHome },
     { name: 'Clients', path: '/clients', icon: FiUsers },
     { name: 'Projects', path: '/projects', icon: FiFileText },
-    { name: 'Devis', path: '/devis', icon: FiFileText },
+    { name: 'Quotes', path: '/quotes', icon: FiFileText },
   ];
 
   return (

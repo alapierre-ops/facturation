@@ -11,9 +11,10 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
-app.use('/api/auth', require('./api/auth'));
-app.use('/api/clients', require('./api/clients'));
-app.use('/api/projects', require('./api/projects'));
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/clients', require('./routes/clients'));
+app.use('/api/projects', require('./routes/projects'));
+app.use('/api/quotes', require('./routes/quotes'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

@@ -1,12 +1,8 @@
-const express = require('express');
-const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const { z } = require('zod');
-const authMiddleware = require('../../middleware/auth');
 
 const prisma = new PrismaClient();
 
-// Validation schema
 const clientSchema = z.object({
   name: z.string().min(2).optional(),
   firstName: z.string().min(2).optional(),
@@ -23,8 +19,7 @@ const clientSchema = z.object({
   path: ['name'],
 });
 
-// Get all clients for the logged-in user
-router.get('/', authMiddleware, async (req, res) => {
+exports.getAllClients = async (req, res) => {
   try {
     const clients = await prisma.client.findMany({
       where: { userId: req.user.userId }
@@ -33,9 +28,9 @@ router.get('/', authMiddleware, async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: 'Error fetching clients' });
   }
-});
+};
 
-router.get('/:id', authMiddleware, async (req, res) => {
+exports.getClientById = async (req, res) => {
   try {
     const client = await prisma.client.findFirst({
       where: {
@@ -43,18 +38,16 @@ router.get('/:id', authMiddleware, async (req, res) => {
         userId: req.user.userId
       }
     });
-
     if (!client) {
       return res.status(404).json({ error: 'Client not found' });
     }
-
     res.json(client);
   } catch (error) {
     res.status(500).json({ error: 'Error fetching client' });
   }
-});
+};
 
-router.post('/', authMiddleware, async (req, res) => {
+exports.createClient = async (req, res) => {
   try {
     const clientData = clientSchema.parse(req.body);
     let name = clientData.name;
@@ -77,28 +70,24 @@ router.post('/', authMiddleware, async (req, res) => {
     }
     res.status(500).json({ error: 'Error creating client' });
   }
-});
+};
 
-router.put('/:id', authMiddleware, async (req, res) => {
+exports.updateClient = async (req, res) => {
   try {
     const clientData = clientSchema.parse(req.body);
-    
     const client = await prisma.client.findFirst({
       where: {
         id: parseInt(req.params.id),
         userId: req.user.userId
       }
     });
-
     if (!client) {
       return res.status(404).json({ error: 'Client not found' });
     }
-
     const updatedClient = await prisma.client.update({
       where: { id: parseInt(req.params.id) },
       data: clientData
     });
-
     res.json(updatedClient);
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -106,9 +95,9 @@ router.put('/:id', authMiddleware, async (req, res) => {
     }
     res.status(500).json({ error: 'Error updating client' });
   }
-});
+};
 
-router.delete('/:id', authMiddleware, async (req, res) => {
+exports.deleteClient = async (req, res) => {
   try {
     const client = await prisma.client.findFirst({
       where: {
@@ -116,19 +105,14 @@ router.delete('/:id', authMiddleware, async (req, res) => {
         userId: req.user.userId
       }
     });
-
     if (!client) {
       return res.status(404).json({ error: 'Client not found' });
     }
-
     await prisma.client.delete({
       where: { id: parseInt(req.params.id) }
     });
-
     res.status(204).send();
   } catch (error) {
     res.status(500).json({ error: 'Error deleting client' });
   }
-});
-
-module.exports = router; 
+}; 

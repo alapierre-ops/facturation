@@ -1,21 +1,22 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
-import { FiPlus } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import Modal from '../components/Modal';
 import ProjectForm from '../components/projects/ProjectForm';
 import toast from 'react-hot-toast';
+import { Link } from 'react-router-dom';
 
 const STATUS_OPTIONS = [
   { label: 'All', value: 'all' },
   { label: 'Prospect', value: 'prospect' },
-  { label: 'In Progress', value: 'in progress' },
+  { label: 'Pending', value: 'pending' },
   { label: 'Finished', value: 'finished' },
   { label: 'Cancelled', value: 'cancelled' },
 ];
 
 const statusColors = {
   prospect: 'bg-yellow-100 text-yellow-800',
-  'in progress': 'bg-blue-100 text-blue-800',
+  'pending': 'bg-blue-100 text-blue-800',
   finished: 'bg-green-100 text-green-800',
   cancelled: 'bg-red-100 text-red-800',
 };
@@ -59,6 +60,27 @@ const ProjectsPage = () => {
     }
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this project?')) {
+      return;
+    }
+
+    try {
+      await api.delete(`/projects/${id}`);
+      setProjects(projects.filter(projects => projects.id !== id));
+    } catch (error) {
+      setError('Failed to delete project');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-500">Loading...</div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
@@ -101,7 +123,7 @@ const ProjectsPage = () => {
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project Name</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">Status</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
@@ -117,25 +139,35 @@ const ProjectsPage = () => {
             ) : (
               projects.map((project) => (
                 <tr key={project.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{project.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <Link to={`/projects/${project.id}`} className="text-blue-600 hover:underline">
+                      {project.name}
+                    </Link>
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{project.client?.name || '-'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm hidden lg:table-cell">
                     <span className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${statusColors[project.status] || 'bg-gray-100 text-gray-800'}`}>
                       {project.status}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      className="text-blue-600 hover:text-blue-900 mr-4"
-                      onClick={() => {
-                        setEditingProject(project);
-                        setIsEdit(true);
-                        setIsModalOpen(true);
-                      }}
-                    >
-                      Edit
-                    </button>
-                  </td>
+                  <button
+                    className="text-blue-600 hover:text-blue-900 mr-4"
+                    onClick={() => {
+                      setEditingProject(project);
+                      setIsEdit(true);
+                      setIsModalOpen(true);
+                    }}
+                  >
+                    <FiEdit2 className="w-5 h-5" />
+                  </button>
+                  <button
+                    className="text-red-600 hover:text-red-900"
+                    onClick={() => handleDelete(project.id)}
+                  >
+                    <FiTrash2 className="w-5 h-5" />
+                  </button>
+                </td>
                 </tr>
               ))
             )}

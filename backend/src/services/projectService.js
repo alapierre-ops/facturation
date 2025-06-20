@@ -1,13 +1,9 @@
-// Project routes
-const express = require('express');
-const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const { z } = require('zod');
-const authMiddleware = require('../../middleware/auth');
 
 const prisma = new PrismaClient();
 
-router.get('/', authMiddleware, async (req, res) => {
+exports.getAllProjects = async (req, res) => {
   try {
     const userId = req.user.userId;
     const { status } = req.query;
@@ -28,9 +24,9 @@ router.get('/', authMiddleware, async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: 'Error fetching projects' });
   }
-});
+};
 
-router.post('/', authMiddleware, async (req, res) => {
+exports.createProject = async (req, res) => {
   try {
     const schema = z.object({
       name: z.string().min(2),
@@ -40,10 +36,7 @@ router.post('/', authMiddleware, async (req, res) => {
       startDate: z.coerce.date().optional(),
       endDate:   z.coerce.date().optional(),
     });
-
-    const { name, clientId, description, status, startDate, endDate } =
-      schema.parse(req.body);
-
+    const { name, clientId, description, status, startDate, endDate } = schema.parse(req.body);
     const project = await prisma.project.create({
       data: {
         name,
@@ -56,7 +49,6 @@ router.post('/', authMiddleware, async (req, res) => {
       },
       include: { client: { select: { name: true } } },
     });
-
     res.status(201).json(project);
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -64,9 +56,9 @@ router.post('/', authMiddleware, async (req, res) => {
     }
     res.status(500).json({ error: 'Error creating project' });
   }
-});
+};
 
-router.put('/:id', authMiddleware, async (req, res) => {
+exports.updateProject = async (req, res) => {
   try {
     const schema = z.object({
       name: z.string().min(2).optional(),
@@ -76,9 +68,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
       startDate: z.coerce.date().optional().nullable(),
       endDate:   z.coerce.date().optional().nullable(),
     });
-
     const payload = schema.parse(req.body);
-
     const project = await prisma.project.findFirst({
       where: {
         id: parseInt(req.params.id, 10),
@@ -88,16 +78,13 @@ router.put('/:id', authMiddleware, async (req, res) => {
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
-
     const data = Object.fromEntries(
       Object.entries(payload).filter(([, v]) => v !== undefined)
     );
-
     const updated = await prisma.project.update({
       where: { id: project.id },
       data,
     });
-
     res.json(updated);
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -105,6 +92,48 @@ router.put('/:id', authMiddleware, async (req, res) => {
     }
     res.status(500).json({ error: 'Error updating project' });
   }
-});
+};
 
-module.exports = router; 
+exports.deleteProject = async (req, res) => {
+  try {
+    const project = await prisma.project.findFirst({
+      where: {
+        id: parseInt(req.params.id),
+        userId: req.user.userId
+      }
+    });
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    await prisma.project.delete({
+      where: { id: parseInt(req.params.id) }
+    });
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ error: 'Error deleting project' });
+  }
+};
+
+exports.getProjectById = async (req, res) => {
+  try {
+    const projectId = parseInt(req.params.id);
+    const userId = req.user.userId;
+    const project = await prisma.project.findFirst({
+      where: {
+        id: projectId,
+        userId,
+      },
+      include: {
+        client: { select: { name: true } },
+        quotes: true,
+        invoices: true,
+      },
+    });
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    res.json(project);
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching project detail' });
+  }
+}; 
