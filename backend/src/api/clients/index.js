@@ -8,10 +8,19 @@ const prisma = new PrismaClient();
 
 // Validation schema
 const clientSchema = z.object({
-  name: z.string().min(2),
-  email: z.string().email().optional(),
-  phone: z.string().optional(),
-  address: z.string().optional()
+  name: z.string().min(2).optional(),
+  firstName: z.string().min(2).optional(),
+  lastName: z.string().min(2).optional(),
+  email: z.string().email(),
+  phone: z.string(),
+  address: z.string(),
+}).refine((data) => {
+  if (data.name) return true;
+  if (data.firstName && data.lastName) return true;
+  return false;
+}, {
+  message: 'Provide either company name or both first and last name',
+  path: ['name'],
 });
 
 // Get all clients for the logged-in user
@@ -26,7 +35,6 @@ router.get('/', authMiddleware, async (req, res) => {
   }
 });
 
-// Get a single client
 router.get('/:id', authMiddleware, async (req, res) => {
   try {
     const client = await prisma.client.findFirst({
@@ -46,18 +54,22 @@ router.get('/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// Create a new client
 router.post('/', authMiddleware, async (req, res) => {
   try {
     const clientData = clientSchema.parse(req.body);
-    
+    let name = clientData.name;
+    if (!name && clientData.firstName && clientData.lastName) {
+      name = `${clientData.firstName} ${clientData.lastName}`;
+    }
     const client = await prisma.client.create({
       data: {
-        ...clientData,
+        name,
+        email: clientData.email,
+        phone: clientData.phone,
+        address: clientData.address,
         userId: req.user.userId
       }
     });
-
     res.status(201).json(client);
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -67,7 +79,6 @@ router.post('/', authMiddleware, async (req, res) => {
   }
 });
 
-// Update a client
 router.put('/:id', authMiddleware, async (req, res) => {
   try {
     const clientData = clientSchema.parse(req.body);
@@ -97,7 +108,6 @@ router.put('/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// Delete a client
 router.delete('/:id', authMiddleware, async (req, res) => {
   try {
     const client = await prisma.client.findFirst({
