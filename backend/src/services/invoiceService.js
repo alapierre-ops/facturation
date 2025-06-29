@@ -3,146 +3,154 @@ const emailService = require('./emailService');
 
 const prisma = new PrismaClient();
 
-exports.createQuote = async (req, res) => {
+exports.getAllInvoices = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { projectId, status, totalHT, totalTTC, lines } = req.body;
-
-    console.log(req.body);
-    
-    if (!projectId || !Array.isArray(lines) || lines.length === 0) {
-      return res.status(400).json({ error: 'Missing projectId or line items' });
-    }
-
-    const project = await prisma.project.findFirst({
-      where: { id: projectId, userId },
+    const invoices = await prisma.invoice.findMany({
+      where: { userId },
+      include: {
+        client: { select: { name: true } },
+        project: { select: { name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
     });
-
-    if (!project) {
-      return res.status(403).json({ error: 'Project not found or not authorized' });
-    }
-
-    const number = 'Q-' + Date.now();
-    const quoteData = {
-      number,
-      status: status || 'draft',
-      totalHT,
-      totalTTC,
-      userId,
-      clientId: project.clientId,
-      projectId,
-    };
-
-    console.log(quoteData);
-    
-    const result = await prisma.$transaction(async (tx) => {
-      const quote = await tx.quotes.create({
-        data: quoteData,
-      });
-      const lineCreates = lines.map((line) =>
-        tx.lineQuote.create({
-          data: {
-            ...line,
-            quoteId: quote.id,
-          },
-        })
-      );
-      await Promise.all(lineCreates);
-      return tx.quotes.findUnique({
-        where: { id: quote.id },
-        include: { lines: true },
-      });
-    });
-    console.log(result);
-    res.status(201).json(result);
+    res.json(invoices);
   } catch (error) {
-    console.log(error);
-    res.status(500).json({ error: 'Error creating quote' });
+    res.status(500).json({ error: 'Error fetching invoices' });
   }
 };
 
-exports.getQuoteById = async (req, res) => {
+exports.getInvoiceById = async (req, res) => {
   try {
-    const quoteId = parseInt(req.params.id);
+    const invoiceId = parseInt(req.params.id);
     const userId = req.user.userId;
 
-    const quote = await prisma.quotes.findFirst({
+    const invoice = await prisma.invoice.findFirst({
       where: {
-        id: quoteId,
+        id: invoiceId,
         userId,
       },
       include: {
         lines: true,
         client: true,
         project: true,
+        quotes: true,
       },
     });
 
-    if (!quote) {
-      return res.status(404).json({ error: 'Quote not found' });
+    if (!invoice) {
+      return res.status(404).json({ error: 'Invoice not found' });
     }
 
-    res.json(quote);
+    res.json(invoice);
   } catch (error) {
-    console.log(error);
-    res.status(500).json({ error: 'Error fetching quote' });
+    res.status(500).json({ error: 'Error fetching invoice' });
   }
 };
 
-exports.updateQuote = async (req, res) => {
+exports.createInvoice = async (req, res) => {
   try {
-    const quoteId = parseInt(req.params.id);
     const userId = req.user.userId;
-    const { status, totalHT, totalTTC, lines } = req.body;
+    const { clientId, projectId, status, totalHT, totalTTC, dueDate, lines } = req.body;
 
-    // Vérifier que le devis existe et appartient à l'utilisateur
-    const existingQuote = await prisma.quotes.findFirst({
+    if (!clientId || !Array.isArray(lines) || lines.length === 0) {
+      return res.status(400).json({ error: 'Missing clientId or line items' });
+    }
+
+    const number = 'F-' + Date.now();
+    const invoiceData = {
+      number,
+      status: status || 'draft',
+      totalHT,
+      totalTTC,
+      dueDate: dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+      userId,
+      clientId,
+      projectId,
+    };
+
+    const result = await prisma.$transaction(async (tx) => {
+      const invoice = await tx.invoice.create({
+        data: invoiceData,
+      });
+      const lineCreates = lines.map((line) =>
+        tx.lineInvoice.create({
+          data: {
+            ...line,
+            invoiceId: invoice.id,
+          },
+        })
+      );
+      await Promise.all(lineCreates);
+      return tx.invoice.findUnique({
+        where: { id: invoice.id },
+        include: { lines: true },
+      });
+    });
+
+    res.status(201).json(result);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: 'Error creating invoice' });
+  }
+};
+
+exports.updateInvoice = async (req, res) => {
+  try {
+    const invoiceId = parseInt(req.params.id);
+    const userId = req.user.userId;
+    const { status, totalHT, totalTTC, dueDate, lines } = req.body;
+
+    // Vérifier que la facture existe et appartient à l'utilisateur
+    const existingInvoice = await prisma.invoice.findFirst({
       where: {
-        id: quoteId,
+        id: invoiceId,
         userId,
       },
     });
 
-    if (!existingQuote) {
-      return res.status(404).json({ error: 'Quote not found' });
+    if (!existingInvoice) {
+      return res.status(404).json({ error: 'Invoice not found' });
     }
 
-    // Mettre à jour le devis et ses lignes
+    // Mettre à jour la facture et ses lignes
     const result = await prisma.$transaction(async (tx) => {
       // Supprimer les anciennes lignes
-      await tx.lineQuote.deleteMany({
-        where: { quoteId },
+      await tx.lineInvoice.deleteMany({
+        where: { invoiceId },
       });
 
-      // Mettre à jour le devis
-      const updatedQuote = await tx.quotes.update({
-        where: { id: quoteId },
+      // Mettre à jour la facture
+      const updatedInvoice = await tx.invoice.update({
+        where: { id: invoiceId },
         data: {
-          status: status || existingQuote.status,
-          totalHT: totalHT || existingQuote.totalHT,
-          totalTTC: totalTTC || existingQuote.totalTTC,
+          status: status || existingInvoice.status,
+          totalHT: totalHT || existingInvoice.totalHT,
+          totalTTC: totalTTC || existingInvoice.totalTTC,
+          dueDate: dueDate || existingInvoice.dueDate,
         },
       });
 
       // Créer les nouvelles lignes
       if (lines && Array.isArray(lines)) {
         const lineCreates = lines.map((line) =>
-          tx.lineQuote.create({
+          tx.lineInvoice.create({
             data: {
               ...line,
-              quoteId,
+              invoiceId,
             },
           })
         );
         await Promise.all(lineCreates);
       }
 
-      return tx.quotes.findUnique({
-        where: { id: quoteId },
+      return tx.invoice.findUnique({
+        where: { id: invoiceId },
         include: {
           lines: true,
           client: true,
           project: true,
+          quotes: true,
         },
       });
     });
@@ -150,47 +158,47 @@ exports.updateQuote = async (req, res) => {
     res.json(result);
   } catch (error) {
     console.log(error);
-    res.status(500).json({ error: 'Error updating quote' });
+    res.status(500).json({ error: 'Error updating invoice' });
   }
 };
 
-exports.deleteQuote = async (req, res) => {
+exports.deleteInvoice = async (req, res) => {
   try {
-    const quoteId = parseInt(req.params.id);
+    const invoiceId = parseInt(req.params.id);
     const userId = req.user.userId;
 
-    // Vérifier que le devis existe et appartient à l'utilisateur
-    const quote = await prisma.quotes.findFirst({
+    // Vérifier que la facture existe et appartient à l'utilisateur
+    const invoice = await prisma.invoice.findFirst({
       where: {
-        id: quoteId,
+        id: invoiceId,
         userId,
       },
     });
 
-    if (!quote) {
-      return res.status(404).json({ error: 'Quote not found' });
+    if (!invoice) {
+      return res.status(404).json({ error: 'Invoice not found' });
     }
 
-    // Supprimer le devis et ses lignes
+    // Supprimer la facture et ses lignes
     await prisma.$transaction(async (tx) => {
-      await tx.lineQuote.deleteMany({
-        where: { quoteId },
+      await tx.lineInvoice.deleteMany({
+        where: { invoiceId },
       });
-      await tx.quotes.delete({
-        where: { id: quoteId },
+      await tx.invoice.delete({
+        where: { id: invoiceId },
       });
     });
 
     res.status(204).send();
   } catch (error) {
     console.log(error);
-    res.status(500).json({ error: 'Error deleting quote' });
+    res.status(500).json({ error: 'Error deleting invoice' });
   }
 };
 
-exports.updateQuoteStatus = async (req, res) => {
+exports.updateInvoiceStatus = async (req, res) => {
   try {
-    const quoteId = parseInt(req.params.id);
+    const invoiceId = parseInt(req.params.id);
     const userId = req.user.userId;
     const { status } = req.body;
 
@@ -198,42 +206,43 @@ exports.updateQuoteStatus = async (req, res) => {
       return res.status(400).json({ error: 'Status is required' });
     }
 
-    const validStatuses = ['draft', 'sent', 'accepted', 'refused', 'expired'];
+    const validStatuses = ['draft', 'sent', 'paid', 'overdue', 'cancelled'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
 
-    const quote = await prisma.quotes.findFirst({
+    const invoice = await prisma.invoice.findFirst({
       where: {
-        id: quoteId,
+        id: invoiceId,
         userId,
       },
     });
 
-    if (!quote) {
-      return res.status(404).json({ error: 'Quote not found' });
+    if (!invoice) {
+      return res.status(404).json({ error: 'Invoice not found' });
     }
 
-    const updatedQuote = await prisma.quotes.update({
-      where: { id: quoteId },
+    const updatedInvoice = await prisma.invoice.update({
+      where: { id: invoiceId },
       data: { status },
       include: {
         lines: true,
         client: true,
         project: true,
+        quotes: true,
       },
     });
 
-    res.json(updatedQuote);
+    res.json(updatedInvoice);
   } catch (error) {
     console.log(error);
-    res.status(500).json({ error: 'Error updating quote status' });
+    res.status(500).json({ error: 'Error updating invoice status' });
   }
 };
 
-exports.sendQuoteEmail = async (req, res) => {
+exports.sendInvoiceEmail = async (req, res) => {
   try {
-    const quoteId = parseInt(req.params.id);
+    const invoiceId = parseInt(req.params.id);
     const userId = req.user.userId;
     const { recipientEmail } = req.body;
 
@@ -241,41 +250,42 @@ exports.sendQuoteEmail = async (req, res) => {
       return res.status(400).json({ error: 'Recipient email is required' });
     }
 
-    const quote = await prisma.quotes.findFirst({
+    const invoice = await prisma.invoice.findFirst({
       where: {
-        id: quoteId,
+        id: invoiceId,
         userId,
       },
       include: {
         lines: true,
         client: true,
         project: true,
+        quotes: true,
       },
     });
 
-    if (!quote) {
-      return res.status(404).json({ error: 'Quote not found' });
+    if (!invoice) {
+      return res.status(404).json({ error: 'Invoice not found' });
     }
 
     // Envoyer l'email
-    const emailResult = await emailService.sendQuoteEmail(quote, quote.client, recipientEmail);
+    const emailResult = await emailService.sendInvoiceEmail(invoice, invoice.client, recipientEmail);
 
-    // Mettre à jour le statut du devis à "sent" si ce n'est pas déjà le cas
-    if (quote.status !== 'sent') {
-      await prisma.quotes.update({
-        where: { id: quoteId },
+    // Mettre à jour le statut de la facture à "sent" si ce n'est pas déjà le cas
+    if (invoice.status !== 'sent') {
+      await prisma.invoice.update({
+        where: { id: invoiceId },
         data: { status: 'sent' },
       });
     }
 
     res.json({ 
       success: true, 
-      message: 'Quote sent successfully',
+      message: 'Invoice sent successfully',
       emailResult 
     });
   } catch (error) {
     console.log(error);
-    res.status(500).json({ error: 'Error sending quote email' });
+    res.status(500).json({ error: 'Error sending invoice email' });
   }
 };
 

@@ -8,6 +8,8 @@ import DashboardPage from './pages/DashboardPage';
 import ClientsPage from './pages/ClientsPage';
 import ProjectsPage from './pages/ProjectsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
+import QuoteDetailPage from './pages/QuoteDetailPage';
+import InvoiceDetailPage from './pages/InvoiceDetailPage';
 
 function App() {
   return (
@@ -26,6 +28,8 @@ function App() {
               <Route path="/clients" element={<ClientsPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
               <Route path="/projects/:id" element={<ProjectDetailPage />} />
+              <Route path="/quotes/:id" element={<QuoteDetailPage />} />
+              <Route path="/invoices/:id" element={<InvoiceDetailPage />} />
             </Route>
           </Route>
         </Routes>

@@ -1,0 +1,25 @@
+# Email Configuration Example
+# Copy these variables to your .env file
+
+# Gmail Configuration
+EMAIL_USER="your-email@gmail.com"
+EMAIL_PASSWORD="your-app-password"
+
+# Note: For Gmail, you need to use an App Password, not your regular password
+# To generate an App Password:
+# 1. Go to your Google Account settings
+# 2. Enable 2-factor authentication
+# 3. Go to Security > App passwords
+# 4. Generate a new app password for "Mail"
+
+# Alternative email services:
+# For Outlook/Hotmail:
+# EMAIL_SERVICE="outlook"
+# EMAIL_USER="your-email@outlook.com"
+# EMAIL_PASSWORD="your-password"
+
+# For custom SMTP:
+# EMAIL_HOST="smtp.your-provider.com"
+# EMAIL_PORT="587"
+# EMAIL_USER="your-email@your-domain.com"
+# EMAIL_PASSWORD="your-password" 

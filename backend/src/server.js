@@ -15,6 +15,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/clients', require('./routes/clients'));
 app.use('/api/projects', require('./routes/projects'));
 app.use('/api/quotes', require('./routes/quotes'));
+app.use('/api/invoices', require('./routes/invoices'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

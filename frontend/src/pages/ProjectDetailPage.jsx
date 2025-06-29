@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import api from '../api';
 import DevisForm from '../components/projects/DevisForm';
 import Modal from '../components/Modal';
@@ -106,7 +106,14 @@ const ProjectDetailPage = () => {
             <tbody>
               {project.quotes.map((quote) => (
                 <tr key={quote.id} className="border-t">
-                  <td className="px-4 py-2">{quote.number}</td>
+                  <td className="px-4 py-2">
+                    <Link 
+                      to={`/quotes/${quote.id}`}
+                      className="text-blue-600 hover:text-blue-800 hover:underline"
+                    >
+                      {quote.number}
+                    </Link>
+                  </td>
                   <td className="px-4 py-2">{new Date(quote.date).toLocaleDateString()}</td>
                   <td className="px-4 py-2">{quote.status}</td>
                   <td className="px-4 py-2">{quote.totalTTC.toFixed(2)} €</td>
