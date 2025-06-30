@@ -1,6 +1,6 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { FiHome, FiUsers, FiFileText, FiLogOut, FiMenu } from 'react-icons/fi';
+import { FiHome, FiUsers, FiFileText, FiLogOut, FiMenu, FiUser, FiShield } from 'react-icons/fi';
 import { useState } from 'react';
 
 const Layout = () => {
@@ -12,8 +12,13 @@ const Layout = () => {
     { name: 'Dashboard', path: '/dashboard', icon: FiHome },
     { name: 'Clients', path: '/clients', icon: FiUsers },
     { name: 'Projects', path: '/projects', icon: FiFileText },
-    { name: 'Quotes', path: '/quotes', icon: FiFileText },
+    { name: 'Profile', path: '/profile', icon: FiUser }
   ];
+
+  // Add admin navigation if user is admin
+  if (user?.role === 'admin') {
+    navigation.push({ name: 'User Management', path: '/admin/users', icon: FiShield });
+  }
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -59,12 +64,16 @@ const Layout = () => {
           <div className="p-4 border-t">
             <div className="flex items-center">
               <div className="flex-1">
-                <p className="text-sm font-medium text-gray-900">{user?.name}</p>
+                <p className="text-sm font-medium text-gray-900">{user?.fullName || user?.name}</p>
                 <p className="text-xs text-gray-500">{user?.email}</p>
+                {user?.role === 'admin' && (
+                  <p className="text-xs text-blue-600 font-medium">Admin</p>
+                )}
               </div>
               <button
                 onClick={logout}
                 className="p-2 text-gray-400 hover:text-gray-500"
+                title="Déconnexion"
               >
                 <FiLogOut className="w-5 h-5" />
               </button>
@@ -115,12 +124,16 @@ const Layout = () => {
             <div className="p-4 border-t">
               <div className="flex items-center">
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">{user?.name}</p>
+                  <p className="text-sm font-medium text-gray-900">{user?.fullName || user?.name}</p>
                   <p className="text-xs text-gray-500">{user?.email}</p>
+                  {user?.role === 'admin' && (
+                    <p className="text-xs text-blue-600 font-medium">Admin</p>
+                  )}
                 </div>
                 <button
                   onClick={logout}
                   className="p-2 text-gray-400 hover:text-gray-500"
+                  title="Déconnexion"
                 >
                   <FiLogOut className="w-5 h-5" />
                 </button>

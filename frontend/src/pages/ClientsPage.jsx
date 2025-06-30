@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../api';
-import { FiPlus, FiEdit2, FiTrash2 } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiSearch } from 'react-icons/fi';
 import Modal from '../components/Modal';
 import ClientForm from '../components/clients/ClientForm';
 import toast from 'react-hot-toast';
@@ -12,14 +12,36 @@ const ClientsPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingClient, setEditingClient] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const searchTimeoutRef = useRef(null);
+
+  // Debounce search term
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchTerm]);
 
   useEffect(() => {
     fetchClients();
-  }, []);
+  }, [debouncedSearchTerm]);
 
   const fetchClients = async () => {
     try {
-      const response = await api.get('/clients');
+      setLoading(true);
+      const params = debouncedSearchTerm ? { search: debouncedSearchTerm } : {};
+      const response = await api.get('/clients', { params });
       setClients(response.data);
     } catch (error) {
       setError('Failed to fetch clients');
@@ -36,8 +58,10 @@ const ClientsPage = () => {
     try {
       await api.delete(`/clients/${id}`);
       setClients(clients.filter(client => client.id !== id));
+      toast.success('Client deleted successfully!');
     } catch (error) {
-      setError('Failed to delete client');
+      const errorMessage = error.response?.data?.error || 'Failed to delete client';
+      toast.error(errorMessage);
     }
   };
 
@@ -60,6 +84,22 @@ const ClientsPage = () => {
           <FiPlus className="w-5 h-5 mr-2" />
           Add Client
         </button>
+      </div>
+
+      {/* Search Bar */}
+      <div className="mb-6">
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <FiSearch className="h-5 w-5 text-gray-400" />
+          </div>
+          <input
+            type="text"
+            placeholder="Search clients by name, email, phone, or address..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
       </div>
 
       {error && (
@@ -90,44 +130,51 @@ const ClientsPage = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {clients.map((client) => (
-              <tr key={client.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {client.name}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden lg:table-cell">
-                  {client.email}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden lg:table-cell">
-                  {client.phone}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden lg:table-cell">
-                  {client.address}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button
-                    className="text-blue-600 hover:text-blue-900 mr-4"
-                    onClick={() => {
-                      setEditingClient(client);
-                      setIsModalOpen(true);
-                    }}
-                  >
-                    <FiEdit2 className="w-5 h-5" />
-                  </button>
-                  <button
-                    className="text-red-600 hover:text-red-900"
-                    onClick={() => handleDelete(client.id)}
-                  >
-                    <FiTrash2 className="w-5 h-5" />
-                  </button>
+            {clients.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                  {debouncedSearchTerm ? 'No clients found matching your search.' : 'No clients found.'}
                 </td>
               </tr>
-            ))}
+            ) : (
+              clients.map((client) => (
+                <tr key={client.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {client.name}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden lg:table-cell">
+                    {client.email}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden lg:table-cell">
+                    {client.phone}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden lg:table-cell">
+                    {client.address}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button
+                      className="text-blue-600 hover:text-blue-900 mr-4"
+                      onClick={() => {
+                        setEditingClient(client);
+                        setIsModalOpen(true);
+                      }}
+                    >
+                      <FiEdit2 className="w-5 h-5" />
+                    </button>
+                    <button
+                      className="text-red-600 hover:text-red-900"
+                      onClick={() => handleDelete(client.id)}
+                    >
+                      <FiTrash2 className="w-5 h-5" />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
 
-      {/* Modal for Add Client */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => {
@@ -157,7 +204,8 @@ const ClientsPage = () => {
               setEditingClient(null);
               fetchClients();
             } catch (err) {
-              toast.error(editingClient ? 'Failed to update client' : 'Failed to add client');
+              const errorMessage = err.response?.data?.error || (editingClient ? 'Failed to update client' : 'Failed to add client');
+              toast.error(errorMessage);
             } finally {
               setIsSubmitting(false);
             }
@@ -168,7 +216,6 @@ const ClientsPage = () => {
           }}
           isSubmitting={isSubmitting}
           defaultValues={editingClient ? (() => {
-            // If the client is a person, split name into firstName/lastName
             const nameParts = editingClient.name ? editingClient.name.split(' ') : [];
             if (nameParts.length > 1) {
               return {

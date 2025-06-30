@@ -6,8 +6,9 @@ import Modal from '../components/Modal';
 import toast from 'react-hot-toast';
 
 const statusColors = {
-  prospect: 'bg-yellow-100 text-yellow-800',
-  'pending': 'bg-blue-100 text-blue-800',
+  pending: 'bg-yellow-100 text-yellow-800',
+  quote_sent: 'bg-blue-100 text-blue-800',
+  quote_accepted: 'bg-green-100 text-green-800',
   finished: 'bg-green-100 text-green-800',
   cancelled: 'bg-red-100 text-red-800',
 };
@@ -52,6 +53,15 @@ const ProjectDetailPage = () => {
     }
   };
 
+  const getCurrencySymbol = (country = 'FRANCE') => {
+    const countryMap = {
+      'USA': '$',
+      'FRANCE': '€',
+      'MONACO': '€'
+    };
+    return countryMap[country] || '€';
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center h-64 text-gray-500">Loading...</div>;
   }
@@ -67,7 +77,9 @@ const ProjectDetailPage = () => {
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <h1 className="text-3xl font-bold text-gray-900">{project.name}</h1>
-        <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${statusColors[project.status] || 'bg-gray-100 text-gray-800'}`}>{project.status}</span>
+        <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${statusColors[project.status] || 'bg-gray-100 text-gray-800'}`}>
+          {project.status.replace('_', ' ')}
+        </span>
       </div>
       {/* Info Card */}
       <div className="bg-white shadow rounded-lg p-6 mb-8">
@@ -100,7 +112,8 @@ const ProjectDetailPage = () => {
                 <th className="px-4 py-2 text-left">Number</th>
                 <th className="px-4 py-2 text-left">Date</th>
                 <th className="px-4 py-2 text-left">Status</th>
-                <th className="px-4 py-2 text-left">Total (TTC)</th>
+                <th className="px-4 py-2 text-left">Country</th>
+                <th className="px-4 py-2 text-left">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -116,7 +129,8 @@ const ProjectDetailPage = () => {
                   </td>
                   <td className="px-4 py-2">{new Date(quote.date).toLocaleDateString()}</td>
                   <td className="px-4 py-2">{quote.status}</td>
-                  <td className="px-4 py-2">{quote.totalTTC.toFixed(2)} €</td>
+                  <td className="px-4 py-2">{quote.country}</td>
+                  <td className="px-4 py-2">{quote.total.toFixed(2)} {getCurrencySymbol(quote.country)}</td>
                 </tr>
               ))}
             </tbody>
@@ -148,17 +162,26 @@ const ProjectDetailPage = () => {
                 <th className="px-4 py-2 text-left">Date</th>
                 <th className="px-4 py-2 text-left">Due Date</th>
                 <th className="px-4 py-2 text-left">Status</th>
-                <th className="px-4 py-2 text-left">Total (TTC)</th>
+                <th className="px-4 py-2 text-left">Country</th>
+                <th className="px-4 py-2 text-left">Total</th>
               </tr>
             </thead>
             <tbody>
               {project.invoices.map((invoice) => (
                 <tr key={invoice.id} className="border-t">
-                  <td className="px-4 py-2">{invoice.number}</td>
+                  <td className="px-4 py-2">
+                    <Link 
+                      to={`/invoices/${invoice.id}`}
+                      className="text-blue-600 hover:text-blue-800 hover:underline"
+                    >
+                      {invoice.number}
+                    </Link>
+                  </td>
                   <td className="px-4 py-2">{new Date(invoice.date).toLocaleDateString()}</td>
                   <td className="px-4 py-2">{new Date(invoice.dueDate).toLocaleDateString()}</td>
                   <td className="px-4 py-2">{invoice.status}</td>
-                  <td className="px-4 py-2">{invoice.totalTTC.toFixed(2)} €</td>
+                  <td className="px-4 py-2">{invoice.country}</td>
+                  <td className="px-4 py-2">{invoice.total.toFixed(2)} {getCurrencySymbol(invoice.country)}</td>
                 </tr>
               ))}
             </tbody>

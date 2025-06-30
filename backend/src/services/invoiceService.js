@@ -1,7 +1,24 @@
 const { PrismaClient } = require('@prisma/client');
 const emailService = require('./emailService');
+const taxService = require('./taxService');
 
 const prisma = new PrismaClient();
+
+// Fonction pour générer le prochain numéro de facture
+const generateNextInvoiceNumber = async (userId) => {
+  const lastInvoice = await prisma.invoice.findFirst({
+    where: { userId },
+    orderBy: { number: 'desc' }
+  });
+
+  if (!lastInvoice) {
+    return 'F-0001';
+  }
+
+  const lastNumber = parseInt(lastInvoice.number.replace('F-', ''));
+  const nextNumber = lastNumber + 1;
+  return `F-${nextNumber.toString().padStart(4, '0')}`;
+};
 
 exports.getAllInvoices = async (req, res) => {
   try {
@@ -51,18 +68,37 @@ exports.getInvoiceById = async (req, res) => {
 exports.createInvoice = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { clientId, projectId, status, totalHT, totalTTC, dueDate, lines } = req.body;
+    const { clientId, projectId, status, country, taxRate, dueDate, lines, notes, paymentType } = req.body;
 
     if (!clientId || !Array.isArray(lines) || lines.length === 0) {
       return res.status(400).json({ error: 'Missing clientId or line items' });
     }
 
-    const number = 'F-' + Date.now();
+    const documentTotals = taxService.calculateDocumentTotals(lines, country || 'FRANCE', taxRate || 'STANDARD');
+    
+    const calculatedLines = lines.map(line => {
+      const lineTotals = taxService.calculateLineTotals(line.quantity, line.unitPrice, country || 'FRANCE', taxRate || 'STANDARD');
+      return {
+        description: line.description,
+        quantity: parseFloat(line.quantity),
+        unitPrice: parseFloat(line.unitPrice),
+        subtotal: lineTotals.subtotal,
+        taxAmount: lineTotals.taxAmount,
+        total: lineTotals.total
+      };
+    });
+
+    const number = await generateNextInvoiceNumber(userId);
     const invoiceData = {
       number,
       status: status || 'draft',
-      totalHT,
-      totalTTC,
+      subtotal: documentTotals.subtotal,
+      taxAmount: documentTotals.taxAmount,
+      total: documentTotals.total,
+      country: country || 'FRANCE',
+      taxRate: taxRate || 'STANDARD',
+      notes: notes || null,
+      paymentType: paymentType || null,
       dueDate: dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
       userId,
       clientId,
@@ -73,7 +109,7 @@ exports.createInvoice = async (req, res) => {
       const invoice = await tx.invoice.create({
         data: invoiceData,
       });
-      const lineCreates = lines.map((line) =>
+      const lineCreates = calculatedLines.map((line) =>
         tx.lineInvoice.create({
           data: {
             ...line,
@@ -99,9 +135,8 @@ exports.updateInvoice = async (req, res) => {
   try {
     const invoiceId = parseInt(req.params.id);
     const userId = req.user.userId;
-    const { status, totalHT, totalTTC, dueDate, lines } = req.body;
+    const { status, country, taxRate, dueDate, lines, notes, paymentType } = req.body;
 
-    // Vérifier que la facture existe et appartient à l'utilisateur
     const existingInvoice = await prisma.invoice.findFirst({
       where: {
         id: invoiceId,
@@ -113,27 +148,53 @@ exports.updateInvoice = async (req, res) => {
       return res.status(404).json({ error: 'Invoice not found' });
     }
 
-    // Mettre à jour la facture et ses lignes
+    // Empêcher la modification des factures payées
+    if (existingInvoice.status === 'paid') {
+      return res.status(400).json({ error: 'Cannot modify a paid invoice' });
+    }
+
+    let documentTotals = null;
+    let calculatedLines = null;
+    
+    if (lines && Array.isArray(lines)) {
+      documentTotals = taxService.calculateDocumentTotals(lines, country || existingInvoice.country, taxRate || existingInvoice.taxRate);
+      calculatedLines = lines.map(line => {
+        const lineTotals = taxService.calculateLineTotals(line.quantity, line.unitPrice, country || existingInvoice.country, taxRate || existingInvoice.taxRate);
+        return {
+          description: line.description,
+          quantity: parseFloat(line.quantity),
+          unitPrice: parseFloat(line.unitPrice),
+          subtotal: lineTotals.subtotal,
+          taxAmount: lineTotals.taxAmount,
+          total: lineTotals.total
+        };
+      });
+    }
+
     const result = await prisma.$transaction(async (tx) => {
-      // Supprimer les anciennes lignes
       await tx.lineInvoice.deleteMany({
         where: { invoiceId },
       });
 
-      // Mettre à jour la facture
       const updatedInvoice = await tx.invoice.update({
         where: { id: invoiceId },
         data: {
           status: status || existingInvoice.status,
-          totalHT: totalHT || existingInvoice.totalHT,
-          totalTTC: totalTTC || existingInvoice.totalTTC,
+          country: country || existingInvoice.country,
+          taxRate: taxRate || existingInvoice.taxRate,
           dueDate: dueDate || existingInvoice.dueDate,
+          notes: notes !== undefined ? notes : existingInvoice.notes,
+          paymentType: paymentType !== undefined ? paymentType : existingInvoice.paymentType,
+          ...(documentTotals && {
+            subtotal: documentTotals.subtotal,
+            taxAmount: documentTotals.taxAmount,
+            total: documentTotals.total,
+          }),
         },
       });
 
-      // Créer les nouvelles lignes
-      if (lines && Array.isArray(lines)) {
-        const lineCreates = lines.map((line) =>
+      if (calculatedLines && Array.isArray(calculatedLines)) {
+        const lineCreates = calculatedLines.map((line) =>
           tx.lineInvoice.create({
             data: {
               ...line,
@@ -167,7 +228,6 @@ exports.deleteInvoice = async (req, res) => {
     const invoiceId = parseInt(req.params.id);
     const userId = req.user.userId;
 
-    // Vérifier que la facture existe et appartient à l'utilisateur
     const invoice = await prisma.invoice.findFirst({
       where: {
         id: invoiceId,
@@ -179,7 +239,11 @@ exports.deleteInvoice = async (req, res) => {
       return res.status(404).json({ error: 'Invoice not found' });
     }
 
-    // Supprimer la facture et ses lignes
+    // Empêcher la suppression des factures payées
+    if (invoice.status === 'paid') {
+      return res.status(400).json({ error: 'Cannot delete a paid invoice' });
+    }
+
     await prisma.$transaction(async (tx) => {
       await tx.lineInvoice.deleteMany({
         where: { invoiceId },
@@ -267,10 +331,8 @@ exports.sendInvoiceEmail = async (req, res) => {
       return res.status(404).json({ error: 'Invoice not found' });
     }
 
-    // Envoyer l'email
     const emailResult = await emailService.sendInvoiceEmail(invoice, invoice.client, recipientEmail);
 
-    // Mettre à jour le statut de la facture à "sent" si ce n'est pas déjà le cas
     if (invoice.status !== 'sent') {
       await prisma.invoice.update({
         where: { id: invoiceId },
@@ -298,7 +360,6 @@ exports.createInvoiceFromQuote = async (req, res) => {
       return res.status(400).json({ error: 'Quote ID is required' });
     }
 
-    // Fetch the quote with all its details
     const quote = await prisma.quotes.findFirst({
       where: {
         id: parseInt(quoteId),
@@ -315,36 +376,36 @@ exports.createInvoiceFromQuote = async (req, res) => {
       return res.status(404).json({ error: 'Quote not found' });
     }
 
-    // Check if quote status is 'accepted'
     if (quote.status !== 'accepted') {
       return res.status(400).json({ error: 'Quote must be accepted to generate invoice' });
     }
 
-    // Check if quote was sent less than 30 days ago
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
     if (quote.date < thirtyDaysAgo) {
       return res.status(400).json({ error: 'Quote is too old to generate invoice (more than 30 days)' });
     }
-
-    // Generate invoice number
-    const invoiceNumber = 'F-' + Date.now();
+  
+    const invoiceNumber = await generateNextInvoiceNumber(userId);
     
-    // Set due date to 30 days from now
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 30);
 
     const result = await prisma.$transaction(async (tx) => {
-      // Create the invoice
       const invoice = await tx.invoice.create({
         data: {
           number: invoiceNumber,
           date: new Date(),
           dueDate: dueDate,
           status: 'draft',
-          totalHT: quote.totalHT,
-          totalTTC: quote.totalTTC,
+          subtotal: quote.subtotal,
+          taxAmount: quote.taxAmount,
+          total: quote.total,
+          country: quote.country,
+          taxRate: quote.taxRate,
+          notes: quote.notes,
+          paymentType: quote.paymentType,
           userId: quote.userId,
           clientId: quote.clientId,
           projectId: quote.projectId,
@@ -352,15 +413,15 @@ exports.createInvoiceFromQuote = async (req, res) => {
         },
       });
 
-      // Create invoice lines from quote lines
       const lineCreates = quote.lines.map((line) =>
         tx.lineInvoice.create({
           data: {
             description: line.description,
             quantity: line.quantity,
             unitPrice: line.unitPrice,
-            totalHT: line.totalHT,
-            totalTTC: line.totalTTC,
+            subtotal: line.subtotal,
+            taxAmount: line.taxAmount,
+            total: line.total,
             invoiceId: invoice.id,
           },
         })
@@ -368,7 +429,6 @@ exports.createInvoiceFromQuote = async (req, res) => {
       
       await Promise.all(lineCreates);
 
-      // Return the created invoice with its lines
       return tx.invoice.findUnique({
         where: { id: invoice.id },
         include: {

@@ -1,14 +1,32 @@
 const { PrismaClient } = require('@prisma/client');
 const emailService = require('./emailService');
+const taxService = require('./taxService');
+const projectService = require('./projectService');
 
 const prisma = new PrismaClient();
+
+// Fonction pour générer le prochain numéro de devis
+const generateNextQuoteNumber = async (userId) => {
+  const lastQuote = await prisma.quotes.findFirst({
+    where: { userId },
+    orderBy: { number: 'desc' }
+  });
+
+  if (!lastQuote) {
+    return 'Q-0001';
+  }
+
+  const lastNumber = parseInt(lastQuote.number.replace('Q-', ''));
+  const nextNumber = lastNumber + 1;
+  return `Q-${nextNumber.toString().padStart(4, '0')}`;
+};
 
 exports.createQuote = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { projectId, status, totalHT, totalTTC, lines } = req.body;
+    const { projectId, status, country, taxRate, lines, notes, paymentType } = req.body;
 
-    console.log(req.body);
+    console.log('Request body:', req.body);
     
     if (!projectId || !Array.isArray(lines) || lines.length === 0) {
       return res.status(400).json({ error: 'Missing projectId or line items' });
@@ -16,30 +34,53 @@ exports.createQuote = async (req, res) => {
 
     const project = await prisma.project.findFirst({
       where: { id: projectId, userId },
+      include: { client: true }
     });
 
     if (!project) {
       return res.status(403).json({ error: 'Project not found or not authorized' });
     }
 
-    const number = 'Q-' + Date.now();
+    const documentTotals = taxService.calculateDocumentTotals(lines, country || 'FRANCE', taxRate || 'STANDARD');
+    console.log('Document totals:', documentTotals);
+    
+    const calculatedLines = lines.map(line => {
+      const lineTotals = taxService.calculateLineTotals(line.quantity, line.unitPrice, country || 'FRANCE', taxRate || 'STANDARD');
+      console.log('Line totals for', line.description, ':', lineTotals);
+      return {
+        description: line.description,
+        quantity: parseFloat(line.quantity),
+        unitPrice: parseFloat(line.unitPrice),
+        subtotal: lineTotals.subtotal,
+        taxAmount: lineTotals.taxAmount,
+        total: lineTotals.total
+      };
+    });
+
+    const number = await generateNextQuoteNumber(userId);
     const quoteData = {
       number,
       status: status || 'draft',
-      totalHT,
-      totalTTC,
+      subtotal: documentTotals.subtotal,
+      taxAmount: documentTotals.taxAmount,
+      total: documentTotals.total,
+      country: country || 'FRANCE',
+      taxRate: taxRate || 'STANDARD',
+      notes: notes || null,
+      paymentType: paymentType || null,
       userId,
       clientId: project.clientId,
       projectId,
     };
 
-    console.log(quoteData);
+    console.log('Quote data:', quoteData);
     
     const result = await prisma.$transaction(async (tx) => {
       const quote = await tx.quotes.create({
         data: quoteData,
       });
-      const lineCreates = lines.map((line) =>
+      
+      const lineCreates = calculatedLines.map((line) =>
         tx.lineQuote.create({
           data: {
             ...line,
@@ -48,15 +89,21 @@ exports.createQuote = async (req, res) => {
         })
       );
       await Promise.all(lineCreates);
+      
       return tx.quotes.findUnique({
         where: { id: quote.id },
-        include: { lines: true },
+        include: { 
+          lines: true,
+          client: true,
+          project: true
+        },
       });
     });
-    console.log(result);
+    
+    console.log('Created quote result:', result);
     res.status(201).json(result);
   } catch (error) {
-    console.log(error);
+    console.error('Error creating quote:', error);
     res.status(500).json({ error: 'Error creating quote' });
   }
 };
@@ -93,9 +140,8 @@ exports.updateQuote = async (req, res) => {
   try {
     const quoteId = parseInt(req.params.id);
     const userId = req.user.userId;
-    const { status, totalHT, totalTTC, lines } = req.body;
+    const { status, country, taxRate, lines, notes, paymentType } = req.body;
 
-    // Vérifier que le devis existe et appartient à l'utilisateur
     const existingQuote = await prisma.quotes.findFirst({
       where: {
         id: quoteId,
@@ -107,26 +153,47 @@ exports.updateQuote = async (req, res) => {
       return res.status(404).json({ error: 'Quote not found' });
     }
 
-    // Mettre à jour le devis et ses lignes
+    let documentTotals = null;
+    let calculatedLines = null;
+    
+    if (lines && Array.isArray(lines)) {
+      documentTotals = taxService.calculateDocumentTotals(lines, country || existingQuote.country, taxRate || existingQuote.taxRate);
+      calculatedLines = lines.map(line => {
+        const lineTotals = taxService.calculateLineTotals(line.quantity, line.unitPrice, country || existingQuote.country, taxRate || existingQuote.taxRate);
+        return {
+          description: line.description,
+          quantity: parseFloat(line.quantity),
+          unitPrice: parseFloat(line.unitPrice),
+          subtotal: lineTotals.subtotal,
+          taxAmount: lineTotals.taxAmount,
+          total: lineTotals.total
+        };
+      });
+    }
+
     const result = await prisma.$transaction(async (tx) => {
-      // Supprimer les anciennes lignes
       await tx.lineQuote.deleteMany({
         where: { quoteId },
       });
 
-      // Mettre à jour le devis
       const updatedQuote = await tx.quotes.update({
         where: { id: quoteId },
         data: {
           status: status || existingQuote.status,
-          totalHT: totalHT || existingQuote.totalHT,
-          totalTTC: totalTTC || existingQuote.totalTTC,
+          country: country || existingQuote.country,
+          taxRate: taxRate || existingQuote.taxRate,
+          notes: notes !== undefined ? notes : existingQuote.notes,
+          paymentType: paymentType !== undefined ? paymentType : existingQuote.paymentType,
+          ...(documentTotals && {
+            subtotal: documentTotals.subtotal,
+            taxAmount: documentTotals.taxAmount,
+            total: documentTotals.total,
+          }),
         },
       });
 
-      // Créer les nouvelles lignes
-      if (lines && Array.isArray(lines)) {
-        const lineCreates = lines.map((line) =>
+      if (calculatedLines && Array.isArray(calculatedLines)) {
+        const lineCreates = calculatedLines.map((line) =>
           tx.lineQuote.create({
             data: {
               ...line,
@@ -147,6 +214,11 @@ exports.updateQuote = async (req, res) => {
       });
     });
 
+    // Mettre à jour le statut du projet si nécessaire
+    if (result.projectId) {
+      await projectService.updateProjectStatusFromQuotes(result.projectId);
+    }
+
     res.json(result);
   } catch (error) {
     console.log(error);
@@ -159,7 +231,6 @@ exports.deleteQuote = async (req, res) => {
     const quoteId = parseInt(req.params.id);
     const userId = req.user.userId;
 
-    // Vérifier que le devis existe et appartient à l'utilisateur
     const quote = await prisma.quotes.findFirst({
       where: {
         id: quoteId,
@@ -171,7 +242,6 @@ exports.deleteQuote = async (req, res) => {
       return res.status(404).json({ error: 'Quote not found' });
     }
 
-    // Supprimer le devis et ses lignes
     await prisma.$transaction(async (tx) => {
       await tx.lineQuote.deleteMany({
         where: { quoteId },
@@ -180,6 +250,11 @@ exports.deleteQuote = async (req, res) => {
         where: { id: quoteId },
       });
     });
+
+    // Mettre à jour le statut du projet si nécessaire
+    if (quote.projectId) {
+      await projectService.updateProjectStatusFromQuotes(quote.projectId);
+    }
 
     res.status(204).send();
   } catch (error) {
@@ -224,6 +299,11 @@ exports.updateQuoteStatus = async (req, res) => {
       },
     });
 
+    // Mettre à jour le statut du projet si nécessaire
+    if (updatedQuote.projectId) {
+      await projectService.updateProjectStatusFromQuotes(updatedQuote.projectId);
+    }
+
     res.json(updatedQuote);
   } catch (error) {
     console.log(error);
@@ -257,15 +337,18 @@ exports.sendQuoteEmail = async (req, res) => {
       return res.status(404).json({ error: 'Quote not found' });
     }
 
-    // Envoyer l'email
     const emailResult = await emailService.sendQuoteEmail(quote, quote.client, recipientEmail);
 
-    // Mettre à jour le statut du devis à "sent" si ce n'est pas déjà le cas
     if (quote.status !== 'sent') {
       await prisma.quotes.update({
         where: { id: quoteId },
         data: { status: 'sent' },
       });
+    }
+
+    // Mettre à jour le statut du projet si nécessaire
+    if (quote.projectId) {
+      await projectService.updateProjectStatusFromQuotes(quote.projectId);
     }
 
     res.json({ 
@@ -288,7 +371,6 @@ exports.createInvoiceFromQuote = async (req, res) => {
       return res.status(400).json({ error: 'Quote ID is required' });
     }
 
-    // Fetch the quote with all its details
     const quote = await prisma.quotes.findFirst({
       where: {
         id: parseInt(quoteId),
@@ -305,12 +387,10 @@ exports.createInvoiceFromQuote = async (req, res) => {
       return res.status(404).json({ error: 'Quote not found' });
     }
 
-    // Check if quote status is 'accepted'
     if (quote.status !== 'accepted') {
       return res.status(400).json({ error: 'Quote must be accepted to generate invoice' });
     }
 
-    // Check if quote was sent less than 30 days ago
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
@@ -318,23 +398,25 @@ exports.createInvoiceFromQuote = async (req, res) => {
       return res.status(400).json({ error: 'Quote is too old to generate invoice (more than 30 days)' });
     }
 
-    // Generate invoice number
     const invoiceNumber = 'F-' + Date.now();
     
-    // Set due date to 30 days from now
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 30);
 
     const result = await prisma.$transaction(async (tx) => {
-      // Create the invoice
       const invoice = await tx.invoice.create({
         data: {
           number: invoiceNumber,
           date: new Date(),
           dueDate: dueDate,
           status: 'draft',
-          totalHT: quote.totalHT,
-          totalTTC: quote.totalTTC,
+          subtotal: quote.subtotal,
+          taxAmount: quote.taxAmount,
+          total: quote.total,
+          country: quote.country,
+          taxRate: quote.taxRate,
+          notes: quote.notes,
+          paymentType: quote.paymentType,
           userId: quote.userId,
           clientId: quote.clientId,
           projectId: quote.projectId,
@@ -342,15 +424,15 @@ exports.createInvoiceFromQuote = async (req, res) => {
         },
       });
 
-      // Create invoice lines from quote lines
       const lineCreates = quote.lines.map((line) =>
         tx.lineInvoice.create({
           data: {
             description: line.description,
             quantity: line.quantity,
             unitPrice: line.unitPrice,
-            totalHT: line.totalHT,
-            totalTTC: line.totalTTC,
+            subtotal: line.subtotal,
+            taxAmount: line.taxAmount,
+            total: line.total,
             invoiceId: invoice.id,
           },
         })
@@ -358,7 +440,6 @@ exports.createInvoiceFromQuote = async (req, res) => {
       
       await Promise.all(lineCreates);
 
-      // Return the created invoice with its lines
       return tx.invoice.findUnique({
         where: { id: invoice.id },
         include: {

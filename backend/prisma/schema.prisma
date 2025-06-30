@@ -8,17 +8,24 @@ datasource db {
 }
 
 model User {
-  id        Int       @id @default(autoincrement())
-  email     String    @unique
-  password  String
-  name      String
-  role      String    @default("user")
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  clients   Client[]
-  projects  Project[]
-  quotes    Quotes[]
-  invoices  Invoice[]
+  id                Int       @id @default(autoincrement())
+  email             String    @unique
+  password          String
+  name              String
+  fullName          String?
+  birthDate         DateTime?
+  address           String?
+  phoneNumber       String?
+  maxAnnualTurnover Float?
+  chargeRate        Float?    @default(0)
+  role              String    @default("user")
+  country           String    @default("FRANCE")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  clients           Client[]
+  projects          Project[]
+  quotes            Quotes[]
+  invoices          Invoice[]
 }
 
 model Client {
@@ -27,6 +34,7 @@ model Client {
   email     String?
   phone     String?
   address   String?
+  country   String    @default("FRANCE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   userId    Int
@@ -58,8 +66,13 @@ model Quotes {
   number      String       @unique
   date        DateTime     @default(now())
   status      String       @default("draft")
-  totalHT     Float
-  totalTTC    Float
+  subtotal    Float
+  taxAmount   Float        @default(0)
+  total       Float
+  country     String       @default("FRANCE")
+  taxRate     String       @default("STANDARD")
+  notes       String?
+  paymentType String?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   userId      Int
@@ -77,8 +90,9 @@ model LineQuote {
   description String
   quantity    Float
   unitPrice   Float
-  totalHT     Float
-  totalTTC    Float
+  subtotal    Float
+  taxAmount   Float    @default(0)
+  total       Float
   quoteId     Int
   quotes      Quotes    @relation(fields: [quoteId], references: [id])
 }
@@ -89,8 +103,13 @@ model Invoice {
   date        DateTime      @default(now())
   dueDate     DateTime
   status      String        @default("draft")
-  totalHT     Float
-  totalTTC    Float
+  subtotal    Float
+  taxAmount   Float         @default(0)
+  total       Float
+  country     String        @default("FRANCE")
+  taxRate     String        @default("STANDARD")
+  notes       String?
+  paymentType String?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   userId      Int
@@ -109,8 +128,9 @@ model LineInvoice {
   description String
   quantity    Float
   unitPrice   Float
-  totalHT     Float
-  totalTTC    Float
+  subtotal    Float
+  taxAmount   Float    @default(0)
+  total       Float
   invoiceId   Int
   invoice     Invoice  @relation(fields: [invoiceId], references: [id])
 } 

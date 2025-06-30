@@ -11,4 +11,13 @@ const PrivateRoute = () => {
   return user ? <Outlet /> : <Navigate to="/login" />;
 };
 
-export default PrivateRoute; 
+const AdminRoute = ({ children }) => {
+  const { user } = useAuth();
+  if (!user || user.role !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+};
+
+export default PrivateRoute;
+export { AdminRoute }; 

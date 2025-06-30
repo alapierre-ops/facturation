@@ -6,15 +6,26 @@ const prisma = new PrismaClient();
 exports.getAllProjects = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { status } = req.query;
+    const { status, search } = req.query;
     let where = {
       client: { userId },
     };
+    
     if (status && status !== 'all') {
       where.status = status;
     } else {
-      where.status = { notIn: ['archived', 'cancelled'] };
+      // Par défaut, afficher seulement les projets en attente
+      where.status = 'pending';
     }
+    
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+        { client: { name: { contains: search, mode: 'insensitive' } } }
+      ];
+    }
+    
     const projects = await prisma.project.findMany({
       where,
       include: { client: { select: { name: true } } },
@@ -100,11 +111,29 @@ exports.deleteProject = async (req, res) => {
       where: {
         id: parseInt(req.params.id),
         userId: req.user.userId
+      },
+      include: {
+        invoices: true,
+        quotes: true
       }
     });
+    
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
+    
+    if (project.invoices.length > 0) {
+      return res.status(400).json({ 
+        error: 'Cannot delete project with associated invoices. Please delete the invoices first.' 
+      });
+    }
+    
+    if (project.quotes.length > 0) {
+      return res.status(400).json({ 
+        error: 'Cannot delete project with associated quotes. Please delete the quotes first.' 
+      });
+    }
+    
     await prisma.project.delete({
       where: { id: parseInt(req.params.id) }
     });
@@ -135,5 +164,39 @@ exports.getProjectById = async (req, res) => {
     res.json(project);
   } catch (error) {
     res.status(500).json({ error: 'Error fetching project detail' });
+  }
+};
+
+// Fonction pour mettre à jour automatiquement le statut du projet basé sur les devis
+exports.updateProjectStatusFromQuotes = async (projectId) => {
+  try {
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      include: { quotes: true }
+    });
+
+    if (!project) return;
+
+    const quotes = project.quotes;
+    let newStatus = project.status;
+
+    // Vérifier s'il y a des devis envoyés
+    const hasSentQuotes = quotes.some(quote => quote.status === 'sent');
+    const hasAcceptedQuotes = quotes.some(quote => quote.status === 'accepted');
+
+    if (hasAcceptedQuotes) {
+      newStatus = 'quote_accepted';
+    } else if (hasSentQuotes) {
+      newStatus = 'quote_sent';
+    }
+
+    if (newStatus !== project.status) {
+      await prisma.project.update({
+        where: { id: projectId },
+        data: { status: newStatus }
+      });
+    }
+  } catch (error) {
+    console.error('Error updating project status from quotes:', error);
   }
 }; 

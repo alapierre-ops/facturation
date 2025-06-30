@@ -21,8 +21,24 @@ const clientSchema = z.object({
 
 exports.getAllClients = async (req, res) => {
   try {
+    const { search } = req.query;
+    let whereClause = { userId: req.user.userId };
+    
+    if (search) {
+      whereClause = {
+        userId: req.user.userId,
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+          { phone: { contains: search, mode: 'insensitive' } },
+          { address: { contains: search, mode: 'insensitive' } }
+        ]
+      };
+    }
+    
     const clients = await prisma.client.findMany({
-      where: { userId: req.user.userId }
+      where: whereClause,
+      orderBy: { name: 'asc' }
     });
     res.json(clients);
   } catch (error) {
@@ -65,6 +81,7 @@ exports.createClient = async (req, res) => {
     });
     res.status(201).json(client);
   } catch (error) {
+    console.log(error);
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: error.errors });
     }
@@ -103,11 +120,22 @@ exports.deleteClient = async (req, res) => {
       where: {
         id: parseInt(req.params.id),
         userId: req.user.userId
+      },
+      include: {
+        projects: true
       }
     });
+    
     if (!client) {
       return res.status(404).json({ error: 'Client not found' });
     }
+    
+    if (client.projects.length > 0) {
+      return res.status(400).json({ 
+        error: 'Cannot delete client with associated projects. Please delete the projects first.' 
+      });
+    }
+    
     await prisma.client.delete({
       where: { id: parseInt(req.params.id) }
     });

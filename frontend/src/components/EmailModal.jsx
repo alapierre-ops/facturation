@@ -14,7 +14,7 @@ const EmailModal = ({ isOpen, onClose, onSend, title, recipientEmail, loading })
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-            Email du destinataire
+            Recipient email
           </label>
           <input
             type="email"
@@ -33,14 +33,14 @@ const EmailModal = ({ isOpen, onClose, onSend, title, recipientEmail, loading })
             onClick={onClose}
             className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
           >
-            Annuler
+            Cancel
           </button>
           <button
             type="submit"
             disabled={loading || !email}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Envoi...' : 'Envoyer'}
+            {loading ? 'Sending...' : 'Send'}
           </button>
         </div>
       </form>

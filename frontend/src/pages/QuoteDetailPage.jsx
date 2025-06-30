@@ -15,12 +15,22 @@ const statusColors = {
 };
 
 const statusOptions = [
-  { value: 'draft', label: 'Brouillon' },
-  { value: 'sent', label: 'Envoyé' },
-  { value: 'accepted', label: 'Accepté' },
-  { value: 'refused', label: 'Refusé' },
-  { value: 'expired', label: 'Expiré' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'sent', label: 'Sent' },
+  { value: 'accepted', label: 'Accepted' },
+  { value: 'refused', label: 'Refused' },
+  { value: 'expired', label: 'Expired' },
 ];
+
+const paymentTypeLabels = {
+  check: 'Check',
+  bank_transfer: 'Bank Transfer',
+  crypto: 'Cryptocurrency',
+  credit_card: 'Credit Card',
+  paypal: 'PayPal',
+  cash: 'Cash',
+  other: 'Other'
+};
 
 const QuoteDetailPage = () => {
   const { id } = useParams();
@@ -73,7 +83,6 @@ const QuoteDetailPage = () => {
       toast.success('Quote sent successfully!');
       setIsEmailModalOpen(false);
       
-      // Rafraîchir les données du devis
       const res = await api.get(`/quotes/${id}`);
       setQuote(res.data);
     } catch (err) {
@@ -118,6 +127,18 @@ const QuoteDetailPage = () => {
     return quote.status === 'accepted';
   };
 
+  const getCurrencySymbol = () => {
+    if (!quote) return '€';
+    
+    const countryMap = {
+      'USA': '$',
+      'FRANCE': '€',
+      'MONACO': '€'
+    };
+    
+    return countryMap[quote.country] || '€';
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center h-64 text-gray-500">Loading...</div>;
   }
@@ -143,13 +164,13 @@ const QuoteDetailPage = () => {
             onClick={() => setIsEmailModalOpen(true)}
             className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
           >
-            Envoyer par email
+            Send by email
           </button>
           <button
             onClick={() => setIsStatusModalOpen(true)}
             className="px-3 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700 text-sm"
           >
-            Changer statut
+            Change status
           </button>
           {canGenerateInvoice() && (
             <button
@@ -164,7 +185,7 @@ const QuoteDetailPage = () => {
             onClick={() => setIsDeleteModalOpen(true)}
             className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
           >
-            Supprimer
+            Delete
           </button>
         </div>
       </div>
@@ -187,6 +208,20 @@ const QuoteDetailPage = () => {
                 <span className="text-gray-500 text-sm">Status:</span>
                 <div className="font-medium">{quote.status}</div>
               </div>
+              <div>
+                <span className="text-gray-500 text-sm">Country:</span>
+                <div className="font-medium">{quote.country}</div>
+              </div>
+              <div>
+                <span className="text-gray-500 text-sm">Tax Rate:</span>
+                <div className="font-medium">{quote.taxRate}</div>
+              </div>
+              {quote.paymentType && (
+                <div>
+                  <span className="text-gray-500 text-sm">Payment Type:</span>
+                  <div className="font-medium">{paymentTypeLabels[quote.paymentType] || quote.paymentType}</div>
+                </div>
+              )}
             </div>
           </div>
           <div>
@@ -220,6 +255,14 @@ const QuoteDetailPage = () => {
             </div>
           </div>
         )}
+        {quote.notes && (
+          <div className="mt-6 pt-6 border-t">
+            <h3 className="text-lg font-semibold mb-4">Notes</h3>
+            <div className="bg-gray-50 p-4 rounded-md">
+              <p className="text-gray-700 whitespace-pre-wrap">{quote.notes}</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Quote Lines */}
@@ -239,10 +282,13 @@ const QuoteDetailPage = () => {
                   Unit Price
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Total HT
+                  Subtotal
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Total TTC
+                  Tax Amount
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Total
                 </th>
               </tr>
             </thead>
@@ -251,9 +297,10 @@ const QuoteDetailPage = () => {
                 <tr key={index}>
                   <td className="px-4 py-3 text-sm text-gray-900">{line.description}</td>
                   <td className="px-4 py-3 text-sm text-gray-900 text-right">{line.quantity}</td>
-                  <td className="px-4 py-3 text-sm text-gray-900 text-right">{line.unitPrice.toFixed(2)} €</td>
-                  <td className="px-4 py-3 text-sm text-gray-900 text-right">{line.totalHT.toFixed(2)} €</td>
-                  <td className="px-4 py-3 text-sm text-gray-900 text-right">{line.totalTTC.toFixed(2)} €</td>
+                  <td className="px-4 py-3 text-sm text-gray-900 text-right">{line.unitPrice.toFixed(2)} {getCurrencySymbol()}</td>
+                  <td className="px-4 py-3 text-sm text-gray-900 text-right">{line.subtotal.toFixed(2)} {getCurrencySymbol()}</td>
+                  <td className="px-4 py-3 text-sm text-gray-900 text-right">{line.taxAmount.toFixed(2)} {getCurrencySymbol()}</td>
+                  <td className="px-4 py-3 text-sm text-gray-900 text-right">{line.total.toFixed(2)} {getCurrencySymbol()}</td>
                 </tr>
               ))}
             </tbody>
@@ -266,12 +313,16 @@ const QuoteDetailPage = () => {
         <div className="flex justify-end">
           <div className="w-64">
             <div className="flex justify-between py-2">
-              <span className="text-gray-600">Total HT:</span>
-              <span className="font-medium">{quote.totalHT.toFixed(2)} €</span>
+              <span className="text-gray-600">Subtotal:</span>
+              <span className="font-medium">{quote.subtotal.toFixed(2)} {getCurrencySymbol()}</span>
+            </div>
+            <div className="flex justify-between py-2">
+              <span className="text-gray-600">Tax Amount:</span>
+              <span className="font-medium">{quote.taxAmount.toFixed(2)} {getCurrencySymbol()}</span>
             </div>
             <div className="flex justify-between py-2 border-t">
-              <span className="text-gray-600 font-semibold">Total TTC:</span>
-              <span className="font-bold text-lg">{quote.totalTTC.toFixed(2)} €</span>
+              <span className="text-gray-600 font-semibold">Total:</span>
+              <span className="font-bold text-lg">{quote.total.toFixed(2)} {getCurrencySymbol()}</span>
             </div>
           </div>
         </div>
@@ -282,7 +333,7 @@ const QuoteDetailPage = () => {
         isOpen={isEmailModalOpen}
         onClose={() => setIsEmailModalOpen(false)}
         onSend={handleSendEmail}
-        title="Envoyer le devis par email"
+        title="Send the quote by email"
         recipientEmail={quote.client?.email}
         loading={isSendingEmail}
       />
@@ -291,7 +342,7 @@ const QuoteDetailPage = () => {
         isOpen={isStatusModalOpen}
         onClose={() => setIsStatusModalOpen(false)}
         onUpdate={handleUpdateStatus}
-        title="Changer le statut du devis"
+        title="Change the status of the quote"
         currentStatus={quote.status}
         statusOptions={statusOptions}
         loading={isUpdatingStatus}
@@ -300,23 +351,23 @@ const QuoteDetailPage = () => {
       <Modal
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
-        title="Confirmer la suppression"
+        title="Confirm the deletion"
       >
         <div className="space-y-4">
-          <p>Êtes-vous sûr de vouloir supprimer ce devis ? Cette action est irréversible.</p>
+          <p>Are you sure you want to delete this quote? This action is irreversible.</p>
           <div className="flex justify-end space-x-3">
             <button
               onClick={() => setIsDeleteModalOpen(false)}
               className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
             >
-              Annuler
+              Cancel
             </button>
             <button
               onClick={handleDeleteQuote}
               disabled={isDeleting}
               className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isDeleting ? 'Suppression...' : 'Supprimer'}
+              {isDeleting ? 'Deletion...' : 'Delete'}
             </button>
           </div>
         </div>

@@ -14,7 +14,7 @@ const StatusModal = ({ isOpen, onClose, onUpdate, title, currentStatus, statusOp
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
-            Nouveau statut
+            New status
           </label>
           <select
             id="status"
@@ -23,7 +23,7 @@ const StatusModal = ({ isOpen, onClose, onUpdate, title, currentStatus, statusOp
             required
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="">Sélectionner un statut</option>
+            <option value="">Select a status</option>
             {statusOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
@@ -38,14 +38,14 @@ const StatusModal = ({ isOpen, onClose, onUpdate, title, currentStatus, statusOp
             onClick={onClose}
             className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
           >
-            Annuler
+            Cancel
           </button>
           <button
             type="submit"
             disabled={loading || !status}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Mise à jour...' : 'Mettre à jour'}
+            {loading ? 'Updating...' : 'Update'}
           </button>
         </div>
       </form>

@@ -15,12 +15,22 @@ const statusColors = {
 };
 
 const statusOptions = [
-  { value: 'draft', label: 'Brouillon' },
-  { value: 'sent', label: 'Envoyée' },
-  { value: 'paid', label: 'Payée' },
-  { value: 'overdue', label: 'En retard' },
-  { value: 'cancelled', label: 'Annulée' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'sent', label: 'Sent' },
+  { value: 'paid', label: 'Paid' },
+  { value: 'overdue', label: 'Overdue' },
+  { value: 'cancelled', label: 'Cancelled' },
 ];
+
+const paymentTypeLabels = {
+  check: 'Check',
+  bank_transfer: 'Bank Transfer',
+  crypto: 'Cryptocurrency',
+  credit_card: 'Credit Card',
+  paypal: 'PayPal',
+  cash: 'Cash',
+  other: 'Other'
+};
 
 const InvoiceDetailPage = () => {
   const { id } = useParams();
@@ -58,7 +68,6 @@ const InvoiceDetailPage = () => {
       toast.success('Invoice sent successfully!');
       setIsEmailModalOpen(false);
       
-      // Rafraîchir les données de la facture
       const res = await api.get(`/invoices/${id}`);
       setInvoice(res.data);
     } catch (err) {
@@ -98,6 +107,20 @@ const InvoiceDetailPage = () => {
     }
   };
 
+  const getCurrencySymbol = () => {
+    if (!invoice) return '€';
+    
+    const countryMap = {
+      'USA': '$',
+      'FRANCE': '€',
+      'MONACO': '€'
+    };
+    
+    return countryMap[invoice.country] || '€';
+  };
+
+  const isPaid = invoice?.status === 'paid';
+
   if (loading) {
     return <div className="flex items-center justify-center h-64 text-gray-500">Loading...</div>;
   }
@@ -123,20 +146,24 @@ const InvoiceDetailPage = () => {
             onClick={() => setIsEmailModalOpen(true)}
             className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
           >
-            Envoyer par email
+            Send by email
           </button>
-          <button
-            onClick={() => setIsStatusModalOpen(true)}
-            className="px-3 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700 text-sm"
-          >
-            Changer statut
-          </button>
-          <button
-            onClick={() => setIsDeleteModalOpen(true)}
-            className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
-          >
-            Supprimer
-          </button>
+          {!isPaid && (
+            <button
+              onClick={() => setIsStatusModalOpen(true)}
+              className="px-3 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700 text-sm"
+            >
+              Change status
+            </button>
+          )}
+          {!isPaid && (
+            <button
+              onClick={() => setIsDeleteModalOpen(true)}
+              className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+            >
+              Delete
+            </button>
+          )}
         </div>
       </div>
 
@@ -162,6 +189,20 @@ const InvoiceDetailPage = () => {
                 <span className="text-gray-500 text-sm">Status:</span>
                 <div className="font-medium">{invoice.status}</div>
               </div>
+              <div>
+                <span className="text-gray-500 text-sm">Country:</span>
+                <div className="font-medium">{invoice.country}</div>
+              </div>
+              <div>
+                <span className="text-gray-500 text-sm">Tax Rate:</span>
+                <div className="font-medium">{invoice.taxRate}</div>
+              </div>
+              {invoice.paymentType && (
+                <div>
+                  <span className="text-gray-500 text-sm">Payment Type:</span>
+                  <div className="font-medium">{paymentTypeLabels[invoice.paymentType] || invoice.paymentType}</div>
+                </div>
+              )}
             </div>
           </div>
           <div>
@@ -204,6 +245,14 @@ const InvoiceDetailPage = () => {
             </div>
           </div>
         )}
+        {invoice.notes && (
+          <div className="mt-6 pt-6 border-t">
+            <h3 className="text-lg font-semibold mb-4">Notes</h3>
+            <div className="bg-gray-50 p-4 rounded-md">
+              <p className="text-gray-700 whitespace-pre-wrap">{invoice.notes}</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Invoice Lines */}
@@ -223,10 +272,13 @@ const InvoiceDetailPage = () => {
                   Unit Price
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Total HT
+                  Subtotal
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Total TTC
+                  Tax Amount
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Total
                 </th>
               </tr>
             </thead>
@@ -235,9 +287,10 @@ const InvoiceDetailPage = () => {
                 <tr key={index}>
                   <td className="px-4 py-3 text-sm text-gray-900">{line.description}</td>
                   <td className="px-4 py-3 text-sm text-gray-900 text-right">{line.quantity}</td>
-                  <td className="px-4 py-3 text-sm text-gray-900 text-right">{line.unitPrice.toFixed(2)} €</td>
-                  <td className="px-4 py-3 text-sm text-gray-900 text-right">{line.totalHT.toFixed(2)} €</td>
-                  <td className="px-4 py-3 text-sm text-gray-900 text-right">{line.totalTTC.toFixed(2)} €</td>
+                  <td className="px-4 py-3 text-sm text-gray-900 text-right">{line.unitPrice.toFixed(2)} {getCurrencySymbol()}</td>
+                  <td className="px-4 py-3 text-sm text-gray-900 text-right">{line.subtotal.toFixed(2)} {getCurrencySymbol()}</td>
+                  <td className="px-4 py-3 text-sm text-gray-900 text-right">{line.taxAmount.toFixed(2)} {getCurrencySymbol()}</td>
+                  <td className="px-4 py-3 text-sm text-gray-900 text-right">{line.total.toFixed(2)} {getCurrencySymbol()}</td>
                 </tr>
               ))}
             </tbody>
@@ -250,12 +303,16 @@ const InvoiceDetailPage = () => {
         <div className="flex justify-end">
           <div className="w-64">
             <div className="flex justify-between py-2">
-              <span className="text-gray-600">Total HT:</span>
-              <span className="font-medium">{invoice.totalHT.toFixed(2)} €</span>
+              <span className="text-gray-600">Subtotal:</span>
+              <span className="font-medium">{invoice.subtotal.toFixed(2)} {getCurrencySymbol()}</span>
+            </div>
+            <div className="flex justify-between py-2">
+              <span className="text-gray-600">Tax Amount:</span>
+              <span className="font-medium">{invoice.taxAmount.toFixed(2)} {getCurrencySymbol()}</span>
             </div>
             <div className="flex justify-between py-2 border-t">
-              <span className="text-gray-600 font-semibold">Total TTC:</span>
-              <span className="font-bold text-lg">{invoice.totalTTC.toFixed(2)} €</span>
+              <span className="text-gray-600 font-semibold">Total:</span>
+              <span className="font-bold text-lg">{invoice.total.toFixed(2)} {getCurrencySymbol()}</span>
             </div>
           </div>
         </div>
@@ -266,7 +323,7 @@ const InvoiceDetailPage = () => {
         isOpen={isEmailModalOpen}
         onClose={() => setIsEmailModalOpen(false)}
         onSend={handleSendEmail}
-        title="Envoyer la facture par email"
+        title="Send the invoice by email"
         recipientEmail={invoice.client?.email}
         loading={isSendingEmail}
       />
@@ -275,7 +332,7 @@ const InvoiceDetailPage = () => {
         isOpen={isStatusModalOpen}
         onClose={() => setIsStatusModalOpen(false)}
         onUpdate={handleUpdateStatus}
-        title="Changer le statut de la facture"
+        title="Change the status of the invoice"
         currentStatus={invoice.status}
         statusOptions={statusOptions}
         loading={isUpdatingStatus}
@@ -284,23 +341,23 @@ const InvoiceDetailPage = () => {
       <Modal
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
-        title="Confirmer la suppression"
+        title="Confirm the deletion"
       >
         <div className="space-y-4">
-          <p>Êtes-vous sûr de vouloir supprimer cette facture ? Cette action est irréversible.</p>
+          <p>Are you sure you want to delete this invoice? This action is irreversible.</p>
           <div className="flex justify-end space-x-3">
             <button
               onClick={() => setIsDeleteModalOpen(false)}
               className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
             >
-              Annuler
+              Cancel
             </button>
             <button
               onClick={handleDeleteInvoice}
               disabled={isDeleting}
               className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isDeleting ? 'Suppression...' : 'Supprimer'}
+              {isDeleting ? 'Deletion...' : 'Delete'}
             </button>
           </div>
         </div>

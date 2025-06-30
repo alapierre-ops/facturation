@@ -45,9 +45,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (name, email, password) => {
+  const register = async (userData) => {
     try {
-      const response = await api.post('/auth/register', { name, email, password });
+      const response = await api.post('/auth/register', userData);
       const { token, user } = response.data;
       
       localStorage.setItem('token', token);
@@ -58,6 +58,32 @@ export const AuthProvider = ({ children }) => {
       navigate('/dashboard');
     } catch (error) {
       throw error.response?.data?.error || 'An error occurred during registration';
+    }
+  };
+
+  const getProfile = async () => {
+    try {
+      const response = await api.get('/auth/profile');
+      const { user } = response.data;
+      
+      localStorage.setItem('user', JSON.stringify(user));
+      setUser(user);
+      return user;
+    } catch (error) {
+      throw error.response?.data?.error || 'An error occurred while fetching profile';
+    }
+  };
+
+  const updateProfile = async (profileData) => {
+    try {
+      const response = await api.put('/auth/profile', profileData);
+      const { user } = response.data;
+      
+      localStorage.setItem('user', JSON.stringify(user));
+      setUser(user);
+      return user;
+    } catch (error) {
+      throw error.response?.data?.error || 'An error occurred while updating profile';
     }
   };
 
@@ -74,6 +100,8 @@ export const AuthProvider = ({ children }) => {
     loading,
     login,
     register,
+    getProfile,
+    updateProfile,
     logout
   };
 
