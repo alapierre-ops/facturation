@@ -35,15 +35,6 @@ const MonthlyTurnoverChart = ({ data, year }) => {
 
   const options = {
     responsive: true,
-    plugins: {
-      legend: {
-        position: 'top',
-      },
-      title: {
-        display: true,
-        text: `Monthly Paid Turnover - ${year}`,
-      },
-    },
     scales: {
       y: {
         beginAtZero: true,
@@ -55,6 +46,13 @@ const MonthlyTurnoverChart = ({ data, year }) => {
       }
     },
     plugins: {
+      legend: {
+        position: 'top',
+      },
+      title: {
+        display: true,
+        text: `Monthly Paid Turnover - ${year}`,
+      },
       tooltip: {
         callbacks: {
           label: function(context) {

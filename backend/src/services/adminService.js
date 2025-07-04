@@ -7,7 +7,6 @@ class AdminService {
     this.prisma = new PrismaClient();
   }
 
-  // Check if user is admin
   async isAdmin(userId) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -16,7 +15,6 @@ class AdminService {
     return user?.role === 'admin';
   }
 
-  // Get all users (admin only)
   async getAllUsers() {
     const users = await this.prisma.user.findMany({
       select: {
@@ -25,7 +23,6 @@ class AdminService {
         name: true,
         fullName: true,
         role: true,
-        country: true,
         maxAnnualTurnover: true,
         chargeRate: true,
         createdAt: true,
@@ -45,7 +42,6 @@ class AdminService {
     return users;
   }
 
-  // Get user by ID (admin only)
   async getUserById(userId) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -58,7 +54,6 @@ class AdminService {
         address: true,
         phoneNumber: true,
         role: true,
-        country: true,
         maxAnnualTurnover: true,
         chargeRate: true,
         createdAt: true,
@@ -81,7 +76,6 @@ class AdminService {
     return user;
   }
 
-  // Create new user (admin only)
   async createUser(userData) {
     const createUserSchema = z.object({
       email: z.string().email(),
@@ -93,13 +87,11 @@ class AdminService {
       phoneNumber: z.string().optional(),
       maxAnnualTurnover: z.number().optional(),
       chargeRate: z.number().optional(),
-      role: z.enum(['user', 'admin']).default('user'),
-      country: z.string().default('FRANCE')
+      role: z.enum(['user', 'admin']).default('user')
     });
 
     const validatedData = createUserSchema.parse(userData);
 
-    // Check if user already exists
     const existingUser = await this.prisma.user.findUnique({
       where: { email: validatedData.email }
     });
@@ -108,10 +100,8 @@ class AdminService {
       throw new Error('User with this email already exists');
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(validatedData.password, 10);
 
-    // Create user
     const user = await this.prisma.user.create({
       data: {
         ...validatedData,
@@ -123,7 +113,6 @@ class AdminService {
         name: true,
         fullName: true,
         role: true,
-        country: true,
         maxAnnualTurnover: true,
         chargeRate: true,
         createdAt: true
@@ -133,7 +122,6 @@ class AdminService {
     return user;
   }
 
-  // Update user (admin only)
   async updateUser(userId, updateData) {
     const updateUserSchema = z.object({
       name: z.string().min(2).optional(),
@@ -144,7 +132,6 @@ class AdminService {
       maxAnnualTurnover: z.number().optional(),
       chargeRate: z.number().optional(),
       role: z.enum(['user', 'admin']).optional(),
-      country: z.string().optional()
     });
 
     const validatedData = updateUserSchema.parse(updateData);
@@ -158,7 +145,6 @@ class AdminService {
         name: true,
         fullName: true,
         role: true,
-        country: true,
         maxAnnualTurnover: true,
         chargeRate: true,
         createdAt: true,
@@ -169,9 +155,7 @@ class AdminService {
     return user;
   }
 
-  // Delete user (admin only)
   async deleteUser(userId) {
-    // Check if user has any data
     const userData = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -204,7 +188,6 @@ class AdminService {
     return { message: 'User deleted successfully' };
   }
 
-  // Change user password (admin only)
   async changeUserPassword(userId, newPassword) {
     if (!newPassword || newPassword.length < 6) {
       throw new Error('Password must be at least 6 characters long');
@@ -220,7 +203,6 @@ class AdminService {
     return { message: 'Password changed successfully' };
   }
 
-  // Get user statistics (admin only)
   async getUserStats(userId) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },

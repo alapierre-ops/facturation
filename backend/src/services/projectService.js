@@ -13,9 +13,6 @@ exports.getAllProjects = async (req, res) => {
     
     if (status && status !== 'all') {
       where.status = status;
-    } else {
-      // Par défaut, afficher seulement les projets en attente
-      where.status = 'pending';
     }
     
     if (search) {
@@ -41,7 +38,7 @@ exports.createProject = async (req, res) => {
   try {
     const schema = z.object({
       name: z.string().min(2),
-      clientId: z.number().int(),
+      clientId: z.union([z.string(), z.number()]).transform(val => parseInt(val, 10)),
       description: z.string().optional(),
       status: z.string().optional(),
       startDate: z.coerce.date().optional(),
@@ -73,7 +70,7 @@ exports.updateProject = async (req, res) => {
   try {
     const schema = z.object({
       name: z.string().min(2).optional(),
-      clientId: z.number().int().optional(),
+      clientId: z.union([z.string(), z.number()]).transform(val => parseInt(val, 10)).optional(),
       description: z.string().optional(),
       status: z.string().optional(),
       startDate: z.coerce.date().optional().nullable(),
@@ -150,7 +147,7 @@ exports.getProjectById = async (req, res) => {
     const project = await prisma.project.findFirst({
       where: {
         id: projectId,
-        userId,
+        userId: userId,
       },
       include: {
         client: { select: { name: true } },
@@ -163,11 +160,11 @@ exports.getProjectById = async (req, res) => {
     }
     res.json(project);
   } catch (error) {
+    console.error('Error fetching project detail:', error);
     res.status(500).json({ error: 'Error fetching project detail' });
   }
 };
 
-// Fonction pour mettre à jour automatiquement le statut du projet basé sur les devis
 exports.updateProjectStatusFromQuotes = async (projectId) => {
   try {
     const project = await prisma.project.findUnique({
@@ -180,7 +177,6 @@ exports.updateProjectStatusFromQuotes = async (projectId) => {
     const quotes = project.quotes;
     let newStatus = project.status;
 
-    // Vérifier s'il y a des devis envoyés
     const hasSentQuotes = quotes.some(quote => quote.status === 'sent');
     const hasAcceptedQuotes = quotes.some(quote => quote.status === 'accepted');
 

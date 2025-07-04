@@ -1,5 +1,9 @@
 const quoteService = require('../services/quoteService');
 
+exports.getAllQuotes = async (req, res) => {
+  await quoteService.getAllQuotes(req, res);
+};
+
 exports.createQuote = async (req, res) => {
   await quoteService.createQuote(req, res);
 };

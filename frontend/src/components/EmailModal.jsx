@@ -1,8 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
 import Modal from './Modal';
 
-const EmailModal = ({ isOpen, onClose, onSend, title, recipientEmail, loading }) => {
-  const [email, setEmail] = useState(recipientEmail || '');
+const EmailModal = ({ onClose, onSend, defaultEmail, title }) => {
+  const { t } = useLanguage();
+  const [email, setEmail] = useState(defaultEmail || '');
+
+  useEffect(() => {
+    setEmail(defaultEmail || '');
+  }, [defaultEmail]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -10,11 +16,11 @@ const EmailModal = ({ isOpen, onClose, onSend, title, recipientEmail, loading })
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={title}>
+    <Modal isOpen={true} onClose={onClose} title={title}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-            Recipient email
+          <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            {t('email')}
           </label>
           <input
             type="email"
@@ -22,7 +28,7 @@ const EmailModal = ({ isOpen, onClose, onSend, title, recipientEmail, loading })
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             placeholder="exemple@email.com"
           />
         </div>
@@ -31,16 +37,16 @@ const EmailModal = ({ isOpen, onClose, onSend, title, recipientEmail, loading })
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+            className="px-4 py-2 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
           >
-            Cancel
+            {t('cancel')}
           </button>
           <button
             type="submit"
-            disabled={loading || !email}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={!email}
+            className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Sending...' : 'Send'}
+            {t('sendEmail')}
           </button>
         </div>
       </form>

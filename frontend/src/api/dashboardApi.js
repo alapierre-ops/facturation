@@ -1,19 +1,35 @@
-import api from './index';
+import api from './axiosConfig.js';
 
-export const dashboardApi = {
-  // Get annual activity summary
-  getAnnualSummary: () => api.get('/dashboard/annual-summary'),
-
-  // Get quarterly summary with optional quarter offset
-  getQuarterlySummary: (quarterOffset = 0) => 
-    api.get('/dashboard/quarterly-summary', { params: { quarter: quarterOffset } }),
-
-  // Get monthly paid turnover with optional year
-  getMonthlyTurnover: (year = null) => 
-    api.get('/dashboard/monthly-turnover', { params: year ? { year } : {} }),
-
-  // Get annual turnover evolution
-  getAnnualEvolution: () => api.get('/dashboard/annual-evolution'),
+export const getAnnualSummary = async () => {
+  const response = await api.get('/dashboard/annual-summary');
+  return response.data;
 };
 
-export default dashboardApi; 
+export const getQuarterlySummary = async (quarterOffset = 0) => {
+  const response = await api.get('/dashboard/quarterly-summary', { 
+    params: { quarter: quarterOffset } 
+  });
+  return response.data;
+};
+
+export const getMonthlyTurnover = async (year = null) => {
+  const response = await api.get('/dashboard/monthly-turnover', { 
+    params: year ? { year } : {} 
+  });
+  return response.data;
+};
+
+export const getAnnualEvolution = async () => {
+  const response = await api.get('/dashboard/annual-evolution');
+  return response.data;
+};
+
+export default {
+  getAnnualSummary,
+
+  getQuarterlySummary,
+
+  getMonthlyTurnover,
+
+  getAnnualEvolution,
+}; 

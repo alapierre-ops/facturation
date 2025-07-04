@@ -1,5 +1,4 @@
 const nodemailer = require('nodemailer');
-const taxService = require('./taxService');
 
 const createTransport = () => {
   const emailService = process.env.EMAIL_SERVICE || 'gmail';
@@ -34,16 +33,14 @@ const createTransport = () => {
 };
 
 const generateQuoteEmailTemplate = (quote, client) => {
-  const countryTax = taxService.getTaxRates(quote.country || 'FRANCE');
-  const currencySymbol = countryTax.symbol;
+  const currencySymbol = '€';
   
   const lines = quote.lines.map(line => `
     <tr>
       <td style="padding: 8px; border-bottom: 1px solid #ddd;">${line.description}</td>
       <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${line.quantity}</td>
       <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${line.unitPrice.toFixed(2)} ${currencySymbol}</td>
-      <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${line.subtotal.toFixed(2)} ${currencySymbol}</td>
-      <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${line.total.toFixed(2)} ${currencySymbol}</td>
+      <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${line.amount.toFixed(2)} ${currencySymbol}</td>
     </tr>
   `).join('');
 
@@ -71,8 +68,7 @@ const generateQuoteEmailTemplate = (quote, client) => {
         <div style="margin-bottom: 30px;">
           <h3>Quote Details</h3>
           <p><strong>Date:</strong> ${new Date(quote.date).toLocaleDateString('en-US')}</p>
-          <p><strong>Country:</strong> ${countryTax.name}</p>
-          <p><strong>Tax Rate:</strong> ${quote.taxRate}</p>
+          ${quote.paymentType ? `<p><strong>Payment Type:</strong> ${quote.paymentType}</p>` : ''}
         </div>
 
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
@@ -81,8 +77,7 @@ const generateQuoteEmailTemplate = (quote, client) => {
               <th style="padding: 12px; text-align: left; border-bottom: 2px solid #ddd;">Description</th>
               <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Quantity</th>
               <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Unit Price</th>
-              <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Subtotal</th>
-              <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Total</th>
+              <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Amount</th>
             </tr>
           </thead>
           <tbody>
@@ -92,11 +87,16 @@ const generateQuoteEmailTemplate = (quote, client) => {
 
         <div style="text-align: right; margin-top: 30px;">
           <div style="font-size: 18px; font-weight: bold;">
-            <p>Subtotal: ${quote.subtotal.toFixed(2)} ${currencySymbol}</p>
-            <p>Tax Amount: ${quote.taxAmount.toFixed(2)} ${currencySymbol}</p>
-            <p>Total: ${quote.total.toFixed(2)} ${currencySymbol}</p>
+            <p>Total: ${quote.amount.toFixed(2)} ${currencySymbol}</p>
           </div>
         </div>
+
+        ${quote.notes ? `
+        <div style="margin-top: 30px; padding: 15px; background-color: #f8f9fa; border-left: 4px solid #3498db;">
+          <h4>Notes:</h4>
+          <p>${quote.notes}</p>
+        </div>
+        ` : ''}
 
         <div style="margin-top: 40px; padding: 20px; background-color: #f8f9fa; border-radius: 5px;">
           <p>This quote is valid for 30 days from its date of issue.</p>
@@ -109,16 +109,14 @@ const generateQuoteEmailTemplate = (quote, client) => {
 };
 
 const generateInvoiceEmailTemplate = (invoice, client) => {
-  const countryTax = taxService.getTaxRates(invoice.country || 'FRANCE');
-  const currencySymbol = countryTax.symbol;
+  const currencySymbol = '€';
   
   const lines = invoice.lines.map(line => `
     <tr>
       <td style="padding: 8px; border-bottom: 1px solid #ddd;">${line.description}</td>
       <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${line.quantity}</td>
       <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${line.unitPrice.toFixed(2)} ${currencySymbol}</td>
-      <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${line.subtotal.toFixed(2)} ${currencySymbol}</td>
-      <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${line.total.toFixed(2)} ${currencySymbol}</td>
+      <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${line.amount.toFixed(2)} ${currencySymbol}</td>
     </tr>
   `).join('');
 
@@ -147,8 +145,7 @@ const generateInvoiceEmailTemplate = (invoice, client) => {
           <h3>Invoice Details</h3>
           <p><strong>Date:</strong> ${new Date(invoice.date).toLocaleDateString('en-US')}</p>
           <p><strong>Due Date:</strong> ${new Date(invoice.dueDate).toLocaleDateString('en-US')}</p>
-          <p><strong>Country:</strong> ${countryTax.name}</p>
-          <p><strong>Tax Rate:</strong> ${invoice.taxRate}</p>
+          ${invoice.paymentType ? `<p><strong>Payment Type:</strong> ${invoice.paymentType}</p>` : ''}
         </div>
 
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
@@ -157,8 +154,7 @@ const generateInvoiceEmailTemplate = (invoice, client) => {
               <th style="padding: 12px; text-align: left; border-bottom: 2px solid #ddd;">Description</th>
               <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Quantity</th>
               <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Unit Price</th>
-              <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Subtotal</th>
-              <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Total</th>
+              <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Amount</th>
             </tr>
           </thead>
           <tbody>
@@ -168,11 +164,16 @@ const generateInvoiceEmailTemplate = (invoice, client) => {
 
         <div style="text-align: right; margin-top: 30px;">
           <div style="font-size: 18px; font-weight: bold;">
-            <p>Subtotal: ${invoice.subtotal.toFixed(2)} ${currencySymbol}</p>
-            <p>Tax Amount: ${invoice.taxAmount.toFixed(2)} ${currencySymbol}</p>
-            <p>Total: ${invoice.total.toFixed(2)} ${currencySymbol}</p>
+            <p>Total: ${invoice.amount.toFixed(2)} ${currencySymbol}</p>
           </div>
         </div>
+
+        ${invoice.notes ? `
+        <div style="margin-top: 30px; padding: 15px; background-color: #f8f9fa; border-left: 4px solid #e74c3c;">
+          <h4>Notes:</h4>
+          <p>${invoice.notes}</p>
+        </div>
+        ` : ''}
 
         <div style="margin-top: 40px; padding: 20px; background-color: #f8f9fa; border-radius: 5px;">
           <p><strong>Payment Terms:</strong></p>
@@ -223,4 +224,4 @@ exports.sendInvoiceEmail = async (invoice, client, recipientEmail) => {
     console.error('Error sending invoice email:', error);
     throw new Error('Failed to send invoice email');
   }
-}; 
+};

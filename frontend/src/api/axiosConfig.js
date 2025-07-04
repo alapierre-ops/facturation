@@ -7,6 +7,7 @@ const api = axios.create({
   }
 });
 
+// Request interceptor
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -20,6 +21,7 @@ api.interceptors.request.use(
   }
 );
 
+// Response interceptor
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -32,11 +34,4 @@ api.interceptors.response.use(
   }
 );
 
-export { default as api } from './axiosConfig.js';
-export * from './adminApi.js';
-export * from './authApi.js';
-export * from './clientApi.js';
-export * from './dashboardApi.js';
-export * from './invoiceApi.js';
-export * from './projectApi.js';
-export * from './quoteApi.js'; 
+export default api; 

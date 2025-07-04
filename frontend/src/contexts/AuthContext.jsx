@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../api';
+import { api, login as loginApi, register as registerApi, getAuthProfile, updateAuthProfile } from '../api';
 
 const AuthContext = createContext(null);
 
@@ -31,8 +31,8 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const response = await api.post('/auth/login', { email, password });
-      const { token, user } = response.data;
+      const response = await loginApi({ email, password });
+      const { token, user } = response;
       
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
@@ -47,8 +47,8 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     try {
-      const response = await api.post('/auth/register', userData);
-      const { token, user } = response.data;
+      const response = await registerApi(userData);
+      const { token, user } = response;
       
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
@@ -63,8 +63,8 @@ export const AuthProvider = ({ children }) => {
 
   const getProfile = async () => {
     try {
-      const response = await api.get('/auth/profile');
-      const { user } = response.data;
+      const response = await getAuthProfile();
+      const { user } = response;
       
       localStorage.setItem('user', JSON.stringify(user));
       setUser(user);
@@ -74,10 +74,10 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const updateProfile = async (profileData) => {
+  const updateAuthUser = async (profileData) => {
     try {
-      const response = await api.put('/auth/profile', profileData);
-      const { user } = response.data;
+      const response = await updateAuthProfile(profileData);
+      const { user } = response;
       
       localStorage.setItem('user', JSON.stringify(user));
       setUser(user);
@@ -101,7 +101,7 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     getProfile,
-    updateProfile,
+    updateProfile: updateAuthUser,
     logout
   };
 

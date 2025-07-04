@@ -1,13 +1,36 @@
-import api from './index';
+import api from './axiosConfig.js';
 
-const adminApi = {
-  getAllUsers: () => api.get('/admin/users'),
-  getUserById: (id) => api.get(`/admin/users/${id}`),
-  createUser: (data) => api.post('/admin/users', data),
-  updateUser: (id, data) => api.put(`/admin/users/${id}`, data),
-  deleteUser: (id) => api.delete(`/admin/users/${id}`),
-  changeUserPassword: (id, newPassword) => api.post(`/admin/users/${id}/password`, { newPassword }),
-  getUserStats: (id) => api.get(`/admin/users/${id}/stats`),
+export const getAllUsers = async () => {
+  const response = await api.get('/admin/users');
+  return response.data;
 };
 
-export default adminApi; 
+export const getUserById = async (id) => {
+  const response = await api.get(`/admin/users/${id}`);
+  return response.data;
+};
+
+export const createUser = async (data) => {
+  const response = await api.post('/admin/users', data);
+  return response.data;
+};
+
+export const updateUser = async (id, data) => {
+  const response = await api.put(`/admin/users/${id}`, data);
+  return response.data;
+};
+
+export const deleteUser = async (id) => {
+  const response = await api.delete(`/admin/users/${id}`);
+  return response.data;
+};
+
+export const changeUserPassword = async (id, newPassword) => {
+  const response = await api.post(`/admin/users/${id}/password`, { newPassword });
+  return response.data;
+};
+
+export const getAdminStats = async (id) => {
+  const response = await api.get(`/admin/users/${id}/stats`);
+  return response.data;
+}; 

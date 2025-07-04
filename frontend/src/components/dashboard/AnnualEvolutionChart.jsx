@@ -42,15 +42,6 @@ const AnnualEvolutionChart = ({ data }) => {
 
   const options = {
     responsive: true,
-    plugins: {
-      legend: {
-        position: 'top',
-      },
-      title: {
-        display: true,
-        text: 'Annual Turnover Evolution',
-      },
-    },
     scales: {
       y: {
         beginAtZero: true,
@@ -62,6 +53,13 @@ const AnnualEvolutionChart = ({ data }) => {
       }
     },
     plugins: {
+      legend: {
+        position: 'top',
+      },
+      title: {
+        display: true,
+        text: 'Annual Turnover Evolution',
+      },
       tooltip: {
         callbacks: {
           label: function(context) {

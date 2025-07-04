@@ -1,22 +1,24 @@
 import { useState, useEffect, useRef } from 'react';
-import api from '../api';
+import { api } from '../api';
+import { useLanguage } from '../contexts/LanguageContext';
 import { FiPlus, FiEdit2, FiTrash2, FiSearch } from 'react-icons/fi';
 import Modal from '../components/Modal';
 import ClientForm from '../components/clients/ClientForm';
 import toast from 'react-hot-toast';
 
 const ClientsPage = () => {
+  const { t } = useLanguage();
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [editingClient, setEditingClient] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEdit, setIsEdit] = useState(false);
+  const [editingClient, setEditingClient] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const searchTimeoutRef = useRef(null);
 
-  // Debounce search term
   useEffect(() => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
@@ -24,7 +26,7 @@ const ClientsPage = () => {
     
     searchTimeoutRef.current = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
-    }, 300);
+    }, 500);
 
     return () => {
       if (searchTimeoutRef.current) {
@@ -38,12 +40,16 @@ const ClientsPage = () => {
   }, [debouncedSearchTerm]);
 
   const fetchClients = async () => {
+    setLoading(true);
+    setError('');
     try {
-      setLoading(true);
-      const params = debouncedSearchTerm ? { search: debouncedSearchTerm } : {};
+      const params = {};
+      if (debouncedSearchTerm) {
+        params.search = debouncedSearchTerm;
+      }
       const response = await api.get('/clients', { params });
       setClients(response.data);
-    } catch (error) {
+    } catch (err) {
       setError('Failed to fetch clients');
     } finally {
       setLoading(false);
@@ -51,16 +57,16 @@ const ClientsPage = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this client?')) {
+    if (!window.confirm(t('areYouSure'))) {
       return;
     }
 
     try {
       await api.delete(`/clients/${id}`);
       setClients(clients.filter(client => client.id !== id));
-      toast.success('Client deleted successfully!');
+      toast.success(t('success'));
     } catch (error) {
-      const errorMessage = error.response?.data?.error || 'Failed to delete client';
+      const errorMessage = error.response?.data?.error || t('error');
       toast.error(errorMessage);
     }
   };
@@ -68,105 +74,97 @@ const ClientsPage = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading...</div>
+        <div className="text-gray-500 dark:text-gray-400">{t('loading')}</div>
       </div>
     );
   }
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Clients</h1>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">{t('clients')}</h1>
         <button
-          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          onClick={() => setIsModalOpen(true)}
+          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          onClick={() => {
+            setIsModalOpen(true);
+            setIsEdit(false);
+            setEditingClient(null);
+          }}
         >
           <FiPlus className="w-5 h-5 mr-2" />
-          Add Client
+          {t('createClient')}
         </button>
       </div>
 
-      {/* Search Bar */}
-      <div className="mb-6">
+      <div className="mb-4">
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <FiSearch className="h-5 w-5 text-gray-400" />
           </div>
           <input
             type="text"
-            placeholder="Search clients by name, email, phone, or address..."
+            placeholder={t('search')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
       </div>
 
       {error && (
-        <div className="mb-4 bg-red-50 text-red-500 p-3 rounded-md text-sm">
+        <div className="mb-4 bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 p-3 rounded-md text-sm">
           {error}
         </div>
       )}
 
-      <div className="bg-white shadow rounded-lg overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 text-sm">
-          <thead className="bg-gray-50">
+      <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+          <thead className="bg-gray-50 dark:bg-gray-700">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Name
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
-                Email
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
-                Phone
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
-                Address
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">{t('name')}</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">{t('email')}</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden lg:table-cell">{t('phone')}</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden lg:table-cell">{t('address')}</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">{t('actions')}</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
             {clients.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
-                  {debouncedSearchTerm ? 'No clients found matching your search.' : 'No clients found.'}
+                <td colSpan={5} className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  {debouncedSearchTerm ? t('noDataFound') : t('noClientsYet')}
                 </td>
               </tr>
             ) : (
               clients.map((client) => (
                 <tr key={client.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                     {client.name}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden lg:table-cell">
-                    {client.email}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden lg:table-cell">
-                    {client.phone}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden lg:table-cell">
-                    {client.address}
-                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{client.email}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 hidden lg:table-cell">{client.phone || '-'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 hidden lg:table-cell">{client.address || '-'}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      className="text-blue-600 hover:text-blue-900 mr-4"
-                      onClick={() => {
-                        setEditingClient(client);
-                        setIsModalOpen(true);
-                      }}
-                    >
-                      <FiEdit2 className="w-5 h-5" />
-                    </button>
-                    <button
-                      className="text-red-600 hover:text-red-900"
-                      onClick={() => handleDelete(client.id)}
-                    >
-                      <FiTrash2 className="w-5 h-5" />
-                    </button>
+                    <div className="flex justify-end space-x-2">
+                      <button
+                        className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300"
+                        onClick={() => {
+                          setEditingClient(client);
+                          setIsEdit(true);
+                          setIsModalOpen(true);
+                        }}
+                        title={t('edit')}
+                      >
+                        <FiEdit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(client.id)}
+                        className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
+                        title={t('delete')}
+                      >
+                        <FiTrash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -175,65 +173,30 @@ const ClientsPage = () => {
         </table>
       </div>
 
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setEditingClient(null);
-        }}
-        title={editingClient ? 'Edit Client' : 'Add New Client'}
-      >
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={isEdit ? t('edit') : t('createClient')}>
         <ClientForm
+          client={editingClient}
           onSubmit={async (data) => {
             setIsSubmitting(true);
             try {
-              let payload = { ...data };
-              if (data.firstName && data.lastName) {
-                payload.name = `${data.firstName} ${data.lastName}`;
-                delete payload.firstName;
-                delete payload.lastName;
-              }
-              if (editingClient) {
-                await api.put(`/clients/${editingClient.id}`, payload);
-                toast.success('Client updated successfully!');
+              if (isEdit) {
+                await api.put(`/clients/${editingClient.id}`, data);
+                toast.success(t('success'));
               } else {
-                await api.post('/clients', payload);
-                toast.success('Client added successfully!');
+                await api.post('/clients', data);
+                toast.success(t('success'));
               }
               setIsModalOpen(false);
-              setEditingClient(null);
               fetchClients();
-            } catch (err) {
-              const errorMessage = err.response?.data?.error || (editingClient ? 'Failed to update client' : 'Failed to add client');
+            } catch (error) {
+              const errorMessage = error.response?.data?.error || t('error');
               toast.error(errorMessage);
             } finally {
               setIsSubmitting(false);
             }
           }}
-          onCancel={() => {
-            setIsModalOpen(false);
-            setEditingClient(null);
-          }}
+          onCancel={() => setIsModalOpen(false)}
           isSubmitting={isSubmitting}
-          defaultValues={editingClient ? (() => {
-            const nameParts = editingClient.name ? editingClient.name.split(' ') : [];
-            if (nameParts.length > 1) {
-              return {
-                firstName: nameParts.slice(0, -1).join(' '),
-                lastName: nameParts.slice(-1).join(' '),
-                email: editingClient.email,
-                phone: editingClient.phone,
-                address: editingClient.address,
-              };
-            } else {
-              return {
-                name: editingClient.name,
-                email: editingClient.email,
-                phone: editingClient.phone,
-                address: editingClient.address,
-              };
-            }
-          })() : undefined}
         />
       </Modal>
     </div>

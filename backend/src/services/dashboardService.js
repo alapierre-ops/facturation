@@ -2,6 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 class DashboardService {
+
   async getAnnualActivitySummary(userId) {
     if (!userId) {
       throw new Error('User ID is required');
@@ -11,7 +12,6 @@ class DashboardService {
     const startOfYear = new Date(currentYear, 0, 1);
     const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59);
 
-    // Get user profile for max annual turnover
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { maxAnnualTurnover: true }
@@ -19,7 +19,6 @@ class DashboardService {
 
     const maxAnnualTurnover = user?.maxAnnualTurnover || 0;
 
-    // Get all invoices for the year
     const invoices = await prisma.invoice.findMany({
       where: {
         project: {
@@ -35,7 +34,6 @@ class DashboardService {
       }
     });
 
-    // Calculate totals
     const annualTurnover = invoices
       .filter(invoice => invoice.status === 'paid')
       .reduce((sum, invoice) => sum + parseFloat(invoice.total), 0);
@@ -75,7 +73,6 @@ class DashboardService {
     const startOfQuarter = new Date(targetYear, quarterInYear * 3, 1);
     const endOfQuarter = new Date(targetYear, (quarterInYear + 1) * 3, 0, 23, 59, 59);
 
-    // Get all invoices for the quarter
     const invoices = await prisma.invoice.findMany({
       where: {
         project: {
@@ -91,37 +88,19 @@ class DashboardService {
       }
     });
 
-    // Get all quotes for the quarter
-    const quotes = await prisma.quote.findMany({
-      where: {
-        project: {
-          userId: userId
-        },
-        createdAt: {
-          gte: startOfQuarter,
-          lte: endOfQuarter
-        }
-      },
-      include: {
-        project: true
-      }
-    });
-
-    // Calculate paid turnover
     const paidTurnover = invoices
       .filter(invoice => invoice.status === 'paid')
       .reduce((sum, invoice) => sum + parseFloat(invoice.total), 0);
 
-    // Calculate estimated turnover from quotes
-    const estimatedTurnover = quotes
-      .filter(quote => quote.status === 'accepted')
-      .reduce((sum, quote) => sum + parseFloat(quote.total), 0);
+    const pendingTurnover = invoices
+      .filter(invoice => invoice.status === 'sent' || invoice.status === 'pending')
+      .reduce((sum, invoice) => sum + parseFloat(invoice.total), 0);
 
-    // Calculate charges to be paid (expenses)
-    const chargesToBePaid = 0; // This would need to be implemented based on your expense tracking
+    const overdueTurnover = invoices
+      .filter(invoice => invoice.status === 'overdue')
+      .reduce((sum, invoice) => sum + parseFloat(invoice.total), 0);
 
-    // Calculate estimated charges
-    const estimatedCharges = 0; // This would need to be implemented based on your expense tracking
+    const totalTurnover = paidTurnover + pendingTurnover + overdueTurnover;
 
     const quarterNames = ['Q1', 'Q2', 'Q3', 'Q4'];
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
@@ -134,9 +113,9 @@ class DashboardService {
         display: `${quarterNames[quarterInYear]} ${targetYear} (${monthNames[startOfQuarter.getMonth()]} ${startOfQuarter.getDate()} - ${monthNames[endOfQuarter.getMonth()]} ${endOfQuarter.getDate()}, ${targetYear})`
       },
       paidTurnover: parseFloat(paidTurnover.toFixed(2)),
-      estimatedTurnover: parseFloat(estimatedTurnover.toFixed(2)),
-      chargesToBePaid: parseFloat(chargesToBePaid.toFixed(2)),
-      estimatedCharges: parseFloat(estimatedCharges.toFixed(2))
+      pendingTurnover: parseFloat(pendingTurnover.toFixed(2)),
+      overdueTurnover: parseFloat(overdueTurnover.toFixed(2)),
+      totalTurnover: parseFloat(totalTurnover.toFixed(2))
     };
   }
 
@@ -187,7 +166,6 @@ class DashboardService {
     const currentYear = new Date().getFullYear();
     const years = [];
     
-    // Get data for current year and previous 2 years
     for (let i = 2; i >= 0; i--) {
       const year = currentYear - i;
       const monthlyData = await this.getMonthlyPaidTurnover(userId, year);

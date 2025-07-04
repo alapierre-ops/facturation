@@ -28,8 +28,16 @@ const updateProfileSchema = z.object({
   birthDate: z.string().optional().transform(val => val ? new Date(val) : null),
   address: z.string().optional(),
   phoneNumber: z.string().optional(),
-  maxAnnualTurnover: z.number().optional(),
-  chargeRate: z.number().optional()
+  maxAnnualTurnover: z.union([z.string(), z.number()]).optional().transform(val => {
+    if (val === '' || val === null || val === undefined) return null;
+    const num = parseFloat(val);
+    return isNaN(num) ? null : num;
+  }),
+  chargeRate: z.union([z.string(), z.number()]).optional().transform(val => {
+    if (val === '' || val === null || val === undefined) return null;
+    const num = parseFloat(val);
+    return isNaN(num) ? null : num;
+  })
 });
 
 exports.register = async (req, res) => {
@@ -72,7 +80,8 @@ exports.register = async (req, res) => {
         address: user.address,
         phoneNumber: user.phoneNumber,
         maxAnnualTurnover: user.maxAnnualTurnover,
-        chargeRate: user.chargeRate
+        chargeRate: user.chargeRate,
+        role: user.role
       }
     });
   } catch (error) {
@@ -110,7 +119,8 @@ exports.login = async (req, res) => {
         address: user.address,
         phoneNumber: user.phoneNumber,
         maxAnnualTurnover: user.maxAnnualTurnover,
-        chargeRate: user.chargeRate
+        chargeRate: user.chargeRate,
+        role: user.role
       }
     });
   } catch (error) {
@@ -137,6 +147,7 @@ exports.getProfile = async (req, res) => {
         maxAnnualTurnover: true,
         chargeRate: true,
         country: true,
+        role: true,
         createdAt: true,
         updatedAt: true
       }
@@ -170,7 +181,7 @@ exports.updateProfile = async (req, res) => {
         phoneNumber: true,
         maxAnnualTurnover: true,
         chargeRate: true,
-        country: true,
+        role: true,
         createdAt: true,
         updatedAt: true
       }
@@ -178,6 +189,7 @@ exports.updateProfile = async (req, res) => {
     
     res.json({ user });
   } catch (error) {
+    console.error('Error updating profile:', error);
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: error.errors });
     }

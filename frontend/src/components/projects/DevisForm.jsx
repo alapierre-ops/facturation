@@ -1,306 +1,235 @@
-import { useState, useEffect } from 'react';
-import { getAvailableCountries, getTaxRateOptions, calculateLineTotals } from '../../api/taxApi';
+import React, { useState, useEffect } from 'react';
+import { createQuote, updateQuote } from '../../api';
+import { useLanguage } from '../../contexts/LanguageContext';
 
-const emptyLine = { description: '', quantity: 1, unitPrice: 0, subtotal: 0, taxAmount: 0, total: 0 };
-
-const DevisForm = ({ projectId, onSubmit, onCancel, loading }) => {
-  const [status, setStatus] = useState('draft');
-  const [country, setCountry] = useState('FRANCE');
-  const [taxRate, setTaxRate] = useState('STANDARD');
-  const [notes, setNotes] = useState('');
-  const [paymentType, setPaymentType] = useState('');
-  const [lines, setLines] = useState([{ ...emptyLine }]);
+const DevisForm = ({ project, onClose, onSuccess, editQuote = null }) => {
+  const { t, formatCurrency } = useLanguage();
+  const [form, setForm] = useState({
+    status: 'draft',
+    lines: [{ description: '', quantity: 1, unitPrice: 0 }],
+    notes: '',
+    paymentType: ''
+  });
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [countries, setCountries] = useState([]);
-  const [taxRateOptions, setTaxRateOptions] = useState([]);
-  const [isLoadingTaxData, setIsLoadingTaxData] = useState(false);
-
-  const paymentTypes = [
-    { value: '', label: 'Select payment type' },
-    { value: 'check', label: 'Check' },
-    { value: 'bank_transfer', label: 'Bank Transfer' },
-    { value: 'crypto', label: 'Cryptocurrency' },
-    { value: 'credit_card', label: 'Credit Card' },
-    { value: 'paypal', label: 'PayPal' },
-    { value: 'cash', label: 'Cash' },
-    { value: 'other', label: 'Other' }
-  ];
 
   useEffect(() => {
-    const loadTaxData = async () => {
-      setIsLoadingTaxData(true);
-      try {
-        const countriesRes = await getAvailableCountries();
-        setCountries(countriesRes.data);
-        
-        const taxOptionsRes = await getTaxRateOptions(country);
-        setTaxRateOptions(taxOptionsRes.data);
-      } catch (err) {
-        console.error('Error loading tax data:', err);
-      } finally {
-        setIsLoadingTaxData(false);
-      }
-    };
-    
-    loadTaxData();
-  }, []);
-
-  useEffect(() => {
-    const loadTaxRateOptions = async () => {
-      try {
-        const res = await getTaxRateOptions(country);
-        setTaxRateOptions(res.data);
-        setTaxRate(res.data[0]?.value || 'STANDARD');
-      } catch (err) {
-        console.error('Error loading tax rate options:', err);
-      }
-    };
-    
-    if (country) {
-      loadTaxRateOptions();
+    if (editQuote) {
+      setForm({
+        status: editQuote.status,
+        lines: editQuote.lines.map(line => ({
+          description: line.description,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice
+        })),
+        notes: editQuote.notes || '',
+        paymentType: editQuote.paymentType || ''
+      });
     }
-  }, [country]);
+  }, [editQuote]);
 
-  useEffect(() => {
-    const recalculateAllLines = async () => {
-      if (lines.length > 0 && country && taxRate) {
-        const updatedLines = await Promise.all(
-          lines.map(async (line) => {
-            if (line.quantity && line.unitPrice) {
-              try {
-                const lineTotals = await calculateLineTotals(line.quantity, line.unitPrice, country, taxRate);
-                return {
-                  ...line,
-                  subtotal: lineTotals.data.subtotal,
-                  taxAmount: lineTotals.data.taxAmount,
-                  total: lineTotals.data.total
-                };
-              } catch (err) {
-                console.error('Error recalculating line:', err);
-                return line;
-              }
-            }
-            return line;
-          })
-        );
-        setLines(updatedLines);
-      }
-    };
-
-    recalculateAllLines();
-  }, [country, taxRate]);
-
-  const calculateTotals = () => {
-    let subtotal = 0;
-    let totalTax = 0;
-    
-    lines.forEach(line => {
-      subtotal += line.subtotal || 0;
-      totalTax += line.taxAmount || 0;
-    });
-    
-    return {
-      subtotal: Math.round(subtotal * 100) / 100,
-      taxAmount: Math.round(totalTax * 100) / 100,
-      total: Math.round((subtotal + totalTax) * 100) / 100
-    };
+  const addLine = () => {
+    setForm(prev => ({
+      ...prev,
+      lines: [...prev.lines, { description: '', quantity: 1, unitPrice: 0 }]
+    }));
   };
 
-  const totals = calculateTotals();
-
-  const handleLineChange = async (idx, field, value) => {
-    const updatedLines = [...lines];
-    updatedLines[idx] = { ...updatedLines[idx], [field]: value };
-    
-    if (field === 'quantity' || field === 'unitPrice') {
-      const quantity = field === 'quantity' ? parseFloat(value) : parseFloat(updatedLines[idx].quantity);
-      const unitPrice = field === 'unitPrice' ? parseFloat(value) : parseFloat(updatedLines[idx].unitPrice);
-      
-      if (quantity && unitPrice) {
-        try {
-          const lineTotals = await calculateLineTotals(quantity, unitPrice, country, taxRate);
-          updatedLines[idx] = {
-            ...updatedLines[idx],
-            subtotal: lineTotals.data.subtotal,
-            taxAmount: lineTotals.data.taxAmount,
-            total: lineTotals.data.total
-          };
-        } catch (err) {
-          console.error('Error calculating line totals:', err);
-        }
-      }
+  const removeLine = (index) => {
+    if (form.lines.length > 1) {
+      setForm(prev => ({
+        ...prev,
+        lines: prev.lines.filter((_, i) => i !== index)
+      }));
     }
-    
-    setLines(updatedLines);
   };
 
-  const addLine = () => setLines((prev) => [...prev, { ...emptyLine }]);
-  const removeLine = (idx) => setLines((prev) => prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev);
+  const updateLine = (index, field, value) => {
+    setForm(prev => ({
+      ...prev,
+      lines: prev.lines.map((line, i) => 
+        i === index ? { ...line, [field]: value } : line
+      )
+    }));
+  };
 
-  const handleSubmit = (e) => {
+  const calculateTotal = () => {
+    return form.lines.reduce((total, line) => {
+      return total + (line.quantity * line.unitPrice);
+    }, 0);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
     setError('');
-    if (lines.some(l => !l.description || !l.quantity || !l.unitPrice)) {
-      setError('All line items must have description, quantity, and unit price.');
-      return;
-    }
-    onSubmit({
-      projectId,
-      status,
-      country,
-      taxRate,
-      notes: notes.trim() || null,
-      paymentType: paymentType || null,
-      lines: lines.map(l => ({
-        description: l.description,
-        quantity: parseFloat(l.quantity),
-        unitPrice: parseFloat(l.unitPrice),
-        subtotal: l.subtotal,
-        taxAmount: l.taxAmount,
-        total: l.total,
-      })),
-    });
-  };
 
-  const getCurrencySymbol = () => {
-    const selectedCountry = countries.find(c => c.code === country);
-    return selectedCountry?.symbol || '€';
+    try {
+      const quoteData = {
+        projectId: project.id,
+        total: calculateTotal(),
+        ...form
+      };
+
+      if (editQuote) {
+        await updateQuote(editQuote.id, quoteData);
+      } else {
+        await createQuote(quoteData);
+      }
+
+      onSuccess();
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.error || t('error'));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {error && <div className="bg-red-50 text-red-500 p-2 rounded text-sm">{error}</div>}
-      
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Status</label>
-          <select value={status} onChange={e => setStatus(e.target.value)} className="border rounded px-2 py-1 w-full">
-            <option value="draft">Draft</option>
-            <option value="sent">Sent</option>
-            <option value="accepted">Accepted</option>
-            <option value="rejected">Rejected</option>
-          </select>
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium mb-1">Country</label>
-          <select 
-            value={country} 
-            onChange={e => setCountry(e.target.value)} 
-            className="border rounded px-2 py-1 w-full"
-            disabled={isLoadingTaxData}
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+            {editQuote ? t('edit') : t('createQuote')}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
           >
-            {countries.map(country => (
-              <option key={country.code} value={country.code}>
-                {country.name} ({country.currency})
-              </option>
-            ))}
-          </select>
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium mb-1">Tax Rate</label>
-          <select 
-            value={taxRate} 
-            onChange={e => setTaxRate(e.target.value)} 
-            className="border rounded px-2 py-1 w-full"
-            disabled={isLoadingTaxData}
-          >
-            {taxRateOptions.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            ✕
+          </button>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-1">Payment Type</label>
-          <select 
-            value={paymentType} 
-            onChange={e => setPaymentType(e.target.value)} 
-            className="border rounded px-2 py-1 w-full"
-          >
-            {paymentTypes.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+        {error && (
+          <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/20 border border-red-400 text-red-700 dark:text-red-400 rounded">
+            {error}
+          </div>
+        )}
 
-      <div>
-        <label className="block text-sm font-medium mb-1">Notes</label>
-        <textarea
-          value={notes}
-          onChange={e => setNotes(e.target.value)}
-          placeholder="Additional notes or terms..."
-          rows={3}
-          className="border rounded px-2 py-1 w-full"
-        />
-      </div>
-      
-      <div>
-        <label className="block text-sm font-medium mb-1">Line Items</label>
-        <div className="space-y-2">
-          {lines.map((line, idx) => (
-            <div key={idx} className="flex gap-2 items-end">
-              <input
-                type="text"
-                placeholder="Description"
-                value={line.description}
-                onChange={e => handleLineChange(idx, 'description', e.target.value)}
-                className="border rounded px-2 py-1 flex-1"
-                required
-              />
-              <input
-                type="number"
-                min="0"
-                step="any"
-                placeholder="Quantity"
-                value={line.quantity}
-                onChange={e => handleLineChange(idx, 'quantity', e.target.value)}
-                className="border rounded px-2 py-1 w-24"
-                required
-              />
-              <input
-                type="number"
-                min="0"
-                step="any"
-                placeholder="Unit Price"
-                value={line.unitPrice}
-                onChange={e => handleLineChange(idx, 'unitPrice', e.target.value)}
-                className="border rounded px-2 py-1 w-24"
-                required
-              />
-              <div className="w-20 text-right text-sm">
-                <div>{(line.subtotal || 0).toFixed(2)} {getCurrencySymbol()}</div>
-                <div className="text-xs text-gray-500">+{(line.taxAmount || 0).toFixed(2)}</div>
-                <div className="font-semibold">{(line.total || 0).toFixed(2)} {getCurrencySymbol()}</div>
-              </div>
-              <button type="button" className="text-red-500 px-2" onClick={() => removeLine(idx)} disabled={lines.length === 1}>Remove</button>
+        <form onSubmit={handleSubmit}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+              <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">{t('paymentType')}</label>
+              <select
+                className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                value={form.paymentType}
+                onChange={e => setForm(f => ({ ...f, paymentType: e.target.value }))}
+              >
+                <option value="">{t('selectPaymentType')}</option>
+                <option value="check">{t('check')}</option>
+                <option value="bank_transfer">{t('bankTransfer')}</option>
+                <option value="crypto">{t('crypto')}</option>
+                <option value="cash">{t('cash')}</option>
+                <option value="other">{t('other')}</option>
+              </select>
             </div>
-          ))}
-        </div>
-        <button type="button" className="mt-2 px-3 py-1 bg-gray-200 rounded hover:bg-gray-300" onClick={addLine}>Add Line</button>
+
+            <div>
+              <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">{t('totalAmount')}</label>
+              <div className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white">
+                {formatCurrency(calculateTotal())}
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">{t('lineItems')}</label>
+            <div className="space-y-3">
+              {form.lines.map((line, index) => (
+                <div key={index} className="grid grid-cols-12 gap-2 items-center">
+                  <div className="col-span-6">
+                    <input
+                      type="text"
+                      className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      placeholder={t('description')}
+                      value={line.description}
+                      onChange={e => updateLine(index, 'description', e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <input
+                      type="number"
+                      className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      placeholder={t('quantity')}
+                      value={line.quantity}
+                      onChange={e => updateLine(index, 'quantity', parseFloat(e.target.value) || 0)}
+                      min="0"
+                      step="1"
+                      required
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <input
+                      type="number"
+                      className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      placeholder={t('unitPrice')}
+                      value={line.unitPrice}
+                      onChange={e => updateLine(index, 'unitPrice', parseFloat(e.target.value) || 0)}
+                      min="0"
+                      step="0.01"
+                      required
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <div className="text-right font-medium text-gray-900 dark:text-white">
+                      {formatCurrency(line.quantity * line.unitPrice)}
+                    </div>
+                  </div>
+                  <div className="col-span-1">
+                    {form.lines.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeLine(index)}
+                        className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addLine}
+                className="w-full py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded text-gray-500 dark:text-gray-400 hover:border-gray-400 dark:hover:border-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                {t('addLineItem')}
+              </button>
+            </div>
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">{t('notes')}</label>
+            <textarea
+              className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              rows={3}
+              value={form.notes}
+              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+              placeholder={t('additionalNotes')}
+            />
+          </div>
+
+          <div className="flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-50 dark:hover:bg-gray-700"
+            >
+              {t('cancel')}
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 disabled:opacity-50"
+            >
+              {loading ? t('loading') : (editQuote ? t('update') : t('create'))}
+            </button>
+          </div>
+        </form>
       </div>
-      
-      <div className="flex justify-end gap-4 items-center">
-        <div className="text-right">
-          <div className="text-sm text-gray-600">Subtotal: {totals.subtotal.toFixed(2)} {getCurrencySymbol()}</div>
-          <div className="text-sm text-gray-600">Tax: {totals.taxAmount.toFixed(2)} {getCurrencySymbol()}</div>
-          <div className="font-semibold text-lg">Total: {totals.total.toFixed(2)} {getCurrencySymbol()}</div>
-        </div>
-      </div>
-      
-      <div className="flex justify-end gap-2">
-        <button type="button" className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300" onClick={onCancel} disabled={loading}>Cancel</button>
-        <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700" disabled={loading || isLoadingTaxData}>
-          {loading ? 'Saving...' : 'Save Quote'}
-        </button>
-      </div>
-    </form>
+    </div>
   );
 };
 
