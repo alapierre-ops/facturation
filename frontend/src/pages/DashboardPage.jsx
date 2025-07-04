@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FiChevronLeft, FiChevronRight, FiDollarSign, FiTrendingUp, FiClock, FiFileText, FiTarget } from 'react-icons/fi';
+import { FiChevronLeft, FiChevronRight, FiDollarSign, FiTrendingUp, FiClock, FiFileText, FiTarget, FiAlertCircle } from 'react-icons/fi';
 import { useLanguage } from '../contexts/LanguageContext';
 import { getAnnualSummary, getQuarterlySummary, getMonthlyTurnover, getAnnualEvolution } from '../api';
 import MonthlyTurnoverChart from '../components/dashboard/MonthlyTurnoverChart';
@@ -12,10 +12,8 @@ const DashboardPage = () => {
   const [error, setError] = useState('');
   
   const [annualSummary, setAnnualSummary] = useState(null);
-  
   const [quarterlySummary, setQuarterlySummary] = useState(null);
   const [quarterOffset, setQuarterOffset] = useState(0);
-  
   const [monthlyTurnover, setMonthlyTurnover] = useState([]);
   const [annualEvolution, setAnnualEvolution] = useState([]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -46,6 +44,7 @@ const DashboardPage = () => {
       setMonthlyTurnover(monthlyTurnoverRes);
       setAnnualEvolution(annualEvolutionRes);
     } catch (err) {
+      console.error('Dashboard error:', err);
       setError(t('error'));
       toast.error(t('error'));
     } finally {
@@ -54,7 +53,7 @@ const DashboardPage = () => {
   };
 
   const getProgressPercentage = (current, max) => {
-    if (max === 0) return 0;
+    if (!current || !max || max === 0) return 0;
     return Math.min((current / max) * 100, 100);
   };
 
@@ -76,6 +75,7 @@ const DashboardPage = () => {
         </div>
       )}
 
+      {/* Résumé annuel de l'activité */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">{t('annualActivitySummary')}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -103,13 +103,13 @@ const DashboardPage = () => {
             </div>
           </div>
 
-          <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+          <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg">
             <div className="flex items-center">
-              <FiFileText className="h-8 w-8 text-gray-600 dark:text-gray-400" />
+              <FiFileText className="h-8 w-8 text-orange-600 dark:text-orange-400" />
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t('unsentInvoices')}</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-300">
-                  {annualSummary ? formatCurrency(annualSummary.unsentInvoices) : formatCurrency(0)}
+                <p className="text-sm font-medium text-orange-600 dark:text-orange-400">{t('pendingQuotesAmount')}</p>
+                <p className="text-2xl font-bold text-orange-900 dark:text-orange-300">
+                  {annualSummary ? formatCurrency(annualSummary.pendingQuotesAmount) : formatCurrency(0)}
                 </p>
               </div>
             </div>
@@ -156,6 +156,7 @@ const DashboardPage = () => {
         )}
       </div>
 
+      {/* Résumé trimestriel */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{t('quarterlySummary')}</h2>
@@ -187,32 +188,38 @@ const DashboardPage = () => {
           </div>
 
           <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-            <p className="text-sm font-medium text-blue-600 dark:text-blue-400">{t('pendingTurnover')}</p>
+            <p className="text-sm font-medium text-blue-600 dark:text-blue-400">{t('estimatedTurnover')}</p>
             <p className="text-2xl font-bold text-blue-900 dark:text-blue-300">
-              {quarterlySummary ? formatCurrency(quarterlySummary.pendingTurnover) : formatCurrency(0)}
+              {quarterlySummary ? formatCurrency(quarterlySummary.estimatedTurnover) : formatCurrency(0)}
             </p>
           </div>
 
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
-            <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">{t('overdueTurnover')}</p>
-            <p className="text-2xl font-bold text-yellow-900 dark:text-yellow-300">
-              {quarterlySummary ? formatCurrency(quarterlySummary.overdueTurnover) : formatCurrency(0)}
-            </p>
+          <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg">
+            <div className="flex items-center">
+              <FiAlertCircle className="h-6 w-6 text-red-600 dark:text-red-400 mr-2" />
+              <div>
+                <p className="text-sm font-medium text-red-600 dark:text-red-400">{t('chargesToPay')}</p>
+                <p className="text-2xl font-bold text-red-900 dark:text-red-300">
+                  {quarterlySummary ? formatCurrency(quarterlySummary.chargesToPay) : formatCurrency(0)}
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
-            <p className="text-sm font-medium text-purple-600 dark:text-purple-400">{t('totalTurnover')}</p>
-            <p className="text-2xl font-bold text-purple-900 dark:text-purple-300">
-              {quarterlySummary ? formatCurrency(quarterlySummary.totalTurnover) : formatCurrency(0)}
+          <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg">
+            <p className="text-sm font-medium text-orange-600 dark:text-orange-400">{t('estimatedCharges')}</p>
+            <p className="text-2xl font-bold text-orange-900 dark:text-orange-300">
+              {quarterlySummary ? formatCurrency(quarterlySummary.estimatedCharges) : formatCurrency(0)}
             </p>
           </div>
         </div>
       </div>
 
+      {/* Graphiques */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('monthlyTurnover')}</h3>
-          <MonthlyTurnoverChart data={monthlyTurnover} />
+          <MonthlyTurnoverChart data={monthlyTurnover} year={selectedYear} />
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('annualEvolution')}</h3>

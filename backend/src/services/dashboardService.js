@@ -1,13 +1,12 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-class DashboardService {
+exports.getAnnualActivitySummary = async (userId) => {
+  if (!userId) {
+    throw new Error('User ID is required');
+  }
 
-  async getAnnualActivitySummary(userId) {
-    if (!userId) {
-      throw new Error('User ID is required');
-    }
-
+  try {
     const currentYear = new Date().getFullYear();
     const startOfYear = new Date(currentYear, 0, 1);
     const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59);
@@ -19,49 +18,74 @@ class DashboardService {
 
     const maxAnnualTurnover = user?.maxAnnualTurnover || 0;
 
-    const invoices = await prisma.invoice.findMany({
+    const paidInvoices = await prisma.invoice.findMany({
       where: {
         project: {
           userId: userId
+        },
+        status: 'paid',
+        createdAt: {
+          gte: startOfYear,
+          lte: endOfYear
+        }
+      }
+    });
+
+    const annualTurnover = paidInvoices.reduce((sum, invoice) => sum + parseFloat(invoice.amount || 0), 0);
+
+    const pendingInvoices = await prisma.invoice.findMany({
+      where: {
+        project: {
+          userId: userId
+        },
+        status: {
+          in: ['sent', 'pending']
         },
         createdAt: {
           gte: startOfYear,
           lte: endOfYear
         }
-      },
-      include: {
-        project: true
       }
     });
 
-    const annualTurnover = invoices
-      .filter(invoice => invoice.status === 'paid')
-      .reduce((sum, invoice) => sum + parseFloat(invoice.total), 0);
+    const pendingPayments = pendingInvoices.reduce((sum, invoice) => sum + parseFloat(invoice.amount || 0), 0);
 
-    const pendingPayments = invoices
-      .filter(invoice => invoice.status === 'sent' || invoice.status === 'pending')
-      .reduce((sum, invoice) => sum + parseFloat(invoice.total), 0);
+    const pendingQuotes = await prisma.quotes.findMany({
+      where: {
+        project: {
+          userId: userId
+        },
+        status: 'sent',
+        createdAt: {
+          gte: startOfYear,
+          lte: endOfYear
+        }
+      }
+    });
 
-    const unsentInvoices = invoices
-      .filter(invoice => invoice.status === 'draft')
-      .reduce((sum, invoice) => sum + parseFloat(invoice.total), 0);
+    const pendingQuotesAmount = pendingQuotes.reduce((sum, quote) => sum + parseFloat(quote.amount || 0), 0);
 
     const remainingTurnover = Math.max(0, maxAnnualTurnover - annualTurnover);
 
     return {
       annualTurnover: parseFloat(annualTurnover.toFixed(2)),
       pendingPayments: parseFloat(pendingPayments.toFixed(2)),
-      unsentInvoices: parseFloat(unsentInvoices.toFixed(2)),
+      pendingQuotesAmount: parseFloat(pendingQuotesAmount.toFixed(2)),
       maxAnnualTurnover: parseFloat(maxAnnualTurnover.toFixed(2)),
       remainingTurnover: parseFloat(remainingTurnover.toFixed(2))
     };
+  } catch (error) {
+    console.error('Error in getAnnualActivitySummary:', error);
+    throw error;
+  }
+};
+
+exports.getQuarterlySummary = async (userId, quarterOffset = 0) => {
+  if (!userId) {
+    throw new Error('User ID is required');
   }
 
-  async getQuarterlySummary(userId, quarterOffset = 0) {
-    if (!userId) {
-      throw new Error('User ID is required');
-    }
-
+  try {
     const currentDate = new Date();
     const currentYear = currentDate.getFullYear();
     const currentQuarter = Math.floor(currentDate.getMonth() / 3);
@@ -73,34 +97,67 @@ class DashboardService {
     const startOfQuarter = new Date(targetYear, quarterInYear * 3, 1);
     const endOfQuarter = new Date(targetYear, (quarterInYear + 1) * 3, 0, 23, 59, 59);
 
-    const invoices = await prisma.invoice.findMany({
+    const paidInvoices = await prisma.invoice.findMany({
       where: {
         project: {
           userId: userId
+        },
+        status: 'paid',
+        createdAt: {
+          gte: startOfQuarter,
+          lte: endOfQuarter
+        }
+      }
+    });
+
+    const paidTurnover = paidInvoices.reduce((sum, invoice) => sum + parseFloat(invoice.amount || 0), 0);
+
+    const estimatedInvoices = await prisma.invoice.findMany({
+      where: {
+        project: {
+          userId: userId
+        },
+        status: {
+          in: ['sent', 'pending']
         },
         createdAt: {
           gte: startOfQuarter,
           lte: endOfQuarter
         }
-      },
-      include: {
-        project: true
       }
     });
 
-    const paidTurnover = invoices
-      .filter(invoice => invoice.status === 'paid')
-      .reduce((sum, invoice) => sum + parseFloat(invoice.total), 0);
+    const estimatedTurnover = estimatedInvoices.reduce((sum, invoice) => sum + parseFloat(invoice.amount || 0), 0);
 
-    const pendingTurnover = invoices
-      .filter(invoice => invoice.status === 'sent' || invoice.status === 'pending')
-      .reduce((sum, invoice) => sum + parseFloat(invoice.total), 0);
+    const overdueInvoices = await prisma.invoice.findMany({
+      where: {
+        project: {
+          userId: userId
+        },
+        status: 'overdue',
+        createdAt: {
+          gte: startOfQuarter,
+          lte: endOfQuarter
+        }
+      }
+    });
 
-    const overdueTurnover = invoices
-      .filter(invoice => invoice.status === 'overdue')
-      .reduce((sum, invoice) => sum + parseFloat(invoice.total), 0);
+    const chargesToPay = overdueInvoices.reduce((sum, invoice) => sum + parseFloat(invoice.amount || 0), 0);
 
-    const totalTurnover = paidTurnover + pendingTurnover + overdueTurnover;
+    const estimatedQuotes = await prisma.quotes.findMany({
+      where: {
+        project: {
+          userId: userId
+        },
+        status: 'sent',
+        createdAt: {
+          gte: startOfQuarter,
+          lte: endOfQuarter
+        }
+      }
+    });
+
+    const estimatedCharges = estimatedQuotes.reduce((sum, quote) => sum + parseFloat(quote.amount || 0), 0);
 
     const quarterNames = ['Q1', 'Q2', 'Q3', 'Q4'];
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
@@ -113,17 +170,22 @@ class DashboardService {
         display: `${quarterNames[quarterInYear]} ${targetYear} (${monthNames[startOfQuarter.getMonth()]} ${startOfQuarter.getDate()} - ${monthNames[endOfQuarter.getMonth()]} ${endOfQuarter.getDate()}, ${targetYear})`
       },
       paidTurnover: parseFloat(paidTurnover.toFixed(2)),
-      pendingTurnover: parseFloat(pendingTurnover.toFixed(2)),
-      overdueTurnover: parseFloat(overdueTurnover.toFixed(2)),
-      totalTurnover: parseFloat(totalTurnover.toFixed(2))
+      estimatedTurnover: parseFloat(estimatedTurnover.toFixed(2)),
+      chargesToPay: parseFloat(chargesToPay.toFixed(2)),
+      estimatedCharges: parseFloat(estimatedCharges.toFixed(2))
     };
+  } catch (error) {
+    console.error('Error in getQuarterlySummary:', error);
+    throw error;
+  }
+};
+
+exports.getMonthlyPaidTurnover = async (userId, year = null) => {
+  if (!userId) {
+    throw new Error('User ID is required');
   }
 
-  async getMonthlyPaidTurnover(userId, year = null) {
-    if (!userId) {
-      throw new Error('User ID is required');
-    }
-
+  try {
     const targetYear = year || new Date().getFullYear();
     const startOfYear = new Date(targetYear, 0, 1);
     const endOfYear = new Date(targetYear, 11, 31, 23, 59, 59);
@@ -149,26 +211,31 @@ class DashboardService {
 
     invoices.forEach(invoice => {
       const month = new Date(invoice.createdAt).getMonth();
-      monthlyData[month].turnover += parseFloat(invoice.total);
+      monthlyData[month].turnover += parseFloat(invoice.amount || 0);
     });
 
     return monthlyData.map(data => ({
       ...data,
       turnover: parseFloat(data.turnover.toFixed(2))
     }));
+  } catch (error) {
+    console.error('Error in getMonthlyPaidTurnover:', error);
+    throw error;
+  }
+};
+
+exports.getAnnualTurnoverEvolution = async (userId) => {
+  if (!userId) {
+    throw new Error('User ID is required');
   }
 
-  async getAnnualTurnoverEvolution(userId) {
-    if (!userId) {
-      throw new Error('User ID is required');
-    }
-
+  try {
     const currentYear = new Date().getFullYear();
     const years = [];
     
     for (let i = 2; i >= 0; i--) {
       const year = currentYear - i;
-      const monthlyData = await this.getMonthlyPaidTurnover(userId, year);
+      const monthlyData = await exports.getMonthlyPaidTurnover(userId, year);
       const annualTotal = monthlyData.reduce((sum, month) => sum + month.turnover, 0);
       
       years.push({
@@ -179,7 +246,8 @@ class DashboardService {
     }
 
     return years;
+  } catch (error) {
+    console.error('Error in getAnnualTurnoverEvolution:', error);
+    throw error;
   }
-}
-
-module.exports = new DashboardService(); 
+}; 

@@ -12,7 +12,7 @@ export const useLanguage = () => {
 
 export const LanguageProvider = ({ children }) => {
   const [language, setLanguage] = useState('en');
-  const [currency, setCurrency] = useState('EUR');
+  const [currency, setCurrency] = useState('USD');
 
   const translations = {
     en: {
@@ -168,7 +168,6 @@ export const LanguageProvider = ({ children }) => {
       overdueInvoicesDescription: 'Some sent invoices are past their due date.',
       clearFilters: 'Clear Filters',
       client: 'Client',
-      project: 'Project',
       sendEmail: 'Send Email',
       sendQuoteEmail: 'Send Quote Email',
       sendInvoiceEmail: 'Send Invoice Email',
@@ -202,6 +201,10 @@ export const LanguageProvider = ({ children }) => {
       quoteCreatedSuccessfully: 'Quote created successfully',
       quoteInformation: 'Quote information',
       invoiceDetails: 'Invoice details',
+      estimatedTurnover: 'Estimated Turnover',
+      chargesToPay: 'Charges to Pay',
+      estimatedCharges: 'Estimated Charges',
+      pendingQuotesAmount: 'Pending Quotes Amount',
     },
     fr: {
       dashboard: 'Tableau de bord',
@@ -356,7 +359,6 @@ export const LanguageProvider = ({ children }) => {
       overdueInvoicesDescription: 'Certaines factures envoyées ont dépassé leur date limite de paiement.',
       clearFilters: 'Effacer les filtres',
       client: 'Client',
-      project: 'Projet',
       sendEmail: 'Envoyer un email',
       sendQuoteEmail: 'Envoyer un email de devis',
       sendInvoiceEmail: 'Envoyer un email de facture',
@@ -390,6 +392,10 @@ export const LanguageProvider = ({ children }) => {
       quoteCreatedSuccessfully: 'Devis créé avec succès',
       quoteInformation: 'Informations du devis',
       invoiceDetails: 'Détails de la facture',
+      estimatedTurnover: 'Chiffre d\'affaires estimé',
+      chargesToPay: 'Charges à payer',
+      estimatedCharges: 'Charges estimées',
+      pendingQuotesAmount: 'Montant des devis en attente',
     }
   };
 
@@ -421,6 +427,11 @@ export const LanguageProvider = ({ children }) => {
   const formatCurrency = (amount) => {
     const locale = language === 'fr' ? 'fr-FR' : 'en-US';
     const currencyCode = currency;
+    
+    // Gérer les valeurs null, undefined, NaN
+    if (amount === null || amount === undefined || isNaN(amount)) {
+      amount = 0;
+    }
     
     return new Intl.NumberFormat(locale, {
       style: 'currency',

@@ -3,7 +3,7 @@ const dashboardService = require('../services/dashboardService');
 class DashboardController {
   async getAnnualActivitySummary(req, res) {
     try {
-      const userId = req.user.id;
+      const userId = req.user.userId;
       const summary = await dashboardService.getAnnualActivitySummary(userId);
       res.json(summary);
     } catch (error) {
@@ -14,7 +14,7 @@ class DashboardController {
 
   async getQuarterlySummary(req, res) {
     try {
-      const userId = req.user.id;
+      const userId = req.user.userId;
       const quarterOffset = parseInt(req.query.quarter) || 0;
       const summary = await dashboardService.getQuarterlySummary(userId, quarterOffset);
       res.json(summary);
@@ -26,7 +26,7 @@ class DashboardController {
 
   async getMonthlyPaidTurnover(req, res) {
     try {
-      const userId = req.user.id;
+      const userId = req.user.userId;
       const year = req.query.year ? parseInt(req.query.year) : null;
       const data = await dashboardService.getMonthlyPaidTurnover(userId, year);
       res.json(data);
@@ -38,7 +38,7 @@ class DashboardController {
 
   async getAnnualTurnoverEvolution(req, res) {
     try {
-      const userId = req.user.id;
+      const userId = req.user.userId;
       const data = await dashboardService.getAnnualTurnoverEvolution(userId);
       res.json(data);
     } catch (error) {
